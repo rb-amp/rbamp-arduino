@@ -5,7 +5,7 @@ Hub, Google Cloud IoT, and serverless / managed observability pipelines.
 Each section shows an ESP32 sketch + the cloud-side resources needed.
 
 For self-hosted DIY platforms (Home Assistant, Node-RED, InfluxDB OSS) see
-[DIY Integrations](diy-integrations.md).
+[DIY Integrations](07_diy_integrations.md).
 
 | Cloud | Transport | Auth | Latency | Cost |
 |---|---|---|---|---|
@@ -216,7 +216,7 @@ Device Provisioning Service (DPS) — outside the scope of this library.
 Google deprecated Cloud IoT Core in 2023. Migration paths:
 
 - **MQTT broker on Compute Engine** (you run Mosquitto in a VM) — same
-  ESP32 sketch pattern as [DIY Integrations](diy-integrations.md#home-assistant-mqtt-auto-discovery)
+  ESP32 sketch pattern as [DIY Integrations](07_diy_integrations.md#home-assistant-mqtt-auto-discovery)
   but pointing at your VM's public IP.
 - **HiveMQ Cloud / EMQX Cloud** — managed MQTT brokers, ~$10-20/mo for
   hobbyist tiers.
@@ -231,7 +231,7 @@ pattern below, substituting the Pub/Sub publish endpoint.
 ## InfluxDB Cloud (TLSv1.3 + line-protocol)
 
 InfluxDB Cloud (Serverless tier) accepts line-protocol over HTTPS — same
-shape as the OSS path in [DIY Integrations](diy-integrations.md#influxdb-oss--grafana)
+shape as the OSS path in [DIY Integrations](07_diy_integrations.md#influxdb-oss--grafana)
 but with `cloud2.influxdata.com` as the host and API tokens for auth.
 
 ```cpp
@@ -362,7 +362,7 @@ window — no data loss as long as the ESP32 stays powered.
 ## Power-budget consideration
 
 TLS handshakes are expensive — ~3 s + ~30 kB heap per connection. For
-deep-sleep loggers ([Scenario 9 in 06_examples.md](examples.md#scenario-9--battery-deep-sleep-logger)):
+deep-sleep loggers ([Scenario 9 in 06_examples.md](06_examples.md#scenario-9--battery-deep-sleep-logger)):
 
 - Reuse the TLS session if your sleep duration < 24 h (most managed brokers
   allow session resumption).
@@ -377,9 +377,9 @@ WiFi + TLS, vs ~6 months on WiFi + plain MQTT (per scenario 9 budget).
 
 ## Related documentation
 
-- [Examples](examples.md) — base sketches
-- [DIY Integrations](diy-integrations.md) — self-hosted alternatives
-- [Troubleshooting](troubleshooting.md) — WiFi disconnection / TLS handshake debug
+- [Examples](06_examples.md) — base sketches
+- [DIY Integrations](07_diy_integrations.md) — self-hosted alternatives
+- [Troubleshooting](10_troubleshooting.md) — WiFi disconnection / TLS handshake debug
 
 ## Related — main rbAmp documentation
 
@@ -392,4 +392,4 @@ WiFi + TLS, vs ~6 months on WiFi + plain MQTT (per scenario 9 budget).
 
 ---
 
-[← DIY Integrations](diy-integrations.md) | [Contents](README.md) | [API Reference →](api-reference.md)
+[← DIY Integrations](07_diy_integrations.md) | [Contents](README.md) | [API Reference →](09_api_reference.md)

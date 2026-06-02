@@ -23,7 +23,7 @@ real sketches in the Arduino IDE for the full source.
 ## Scenario 1 — Quick read
 
 Goal: print U / I / P / PF / freq once per second. The "hello world" you
-just wrote in [Quickstart](quickstart.md), but using
+just wrote in [Quickstart](05_quickstart.md), but using
 `dev.readAll(s)` for a one-shot full RT block read instead of individual
 property calls.
 
@@ -237,7 +237,7 @@ void loop() {
 
 Full sketch in [`04_UI3PerChannelMQTT.ino`](../examples/04_UI3PerChannelMQTT/04_UI3PerChannelMQTT.ino).
 For HA MQTT Auto-discovery on top of this base, see
-[DIY Integrations](diy-integrations.md#home-assistant-mqtt-auto-discovery).
+[DIY Integrations](07_diy_integrations.md#home-assistant-mqtt-auto-discovery).
 
 ---
 
@@ -610,10 +610,10 @@ single bad call could lose the device.
 
 ## What next
 
-- [DIY Integrations](diy-integrations.md) — wire these scenarios into Home Assistant / Node-RED / OpenHAB
-- [Cloud Integrations](cloud-integrations.md) — AWS IoT / Azure / GCP / InfluxDB pipelines
-- [API Reference](api-reference.md) — every public method documented
-- [Troubleshooting](troubleshooting.md) — when scenarios misbehave on your bench
+- [DIY Integrations](07_diy_integrations.md) — wire these scenarios into Home Assistant / Node-RED / OpenHAB
+- [Cloud Integrations](08_cloud_integrations.md) — AWS IoT / Azure / GCP / InfluxDB pipelines
+- [API Reference](09_api_reference.md) — every public method documented
+- [Troubleshooting](10_troubleshooting.md) — when scenarios misbehave on your bench
 
 ## Related — main rbAmp documentation
 
@@ -626,4 +626,4 @@ single bad call could lose the device.
 
 ---
 
-[← Quickstart](quickstart.md) | [Contents](README.md) | [DIY Integrations →](diy-integrations.md)
+[← Quickstart](05_quickstart.md) | [Contents](README.md) | [DIY Integrations →](07_diy_integrations.md)

@@ -5,7 +5,7 @@ platforms. Each section shows a minimal working sketch on the ESP32 side
 and the corresponding platform-side configuration.
 
 For cloud / commercial integrations (AWS IoT, Azure, GCP, InfluxDB Cloud)
-see [Cloud Integrations](cloud-integrations.md).
+see [Cloud Integrations](08_cloud_integrations.md).
 
 | Platform | Wire transport | Discovery | Code |
 |---|---|---|---|
@@ -183,7 +183,7 @@ That replaces the entire Arduino sketch above. ESPHome ships native HA
 integration over the ESPHome API (not MQTT) — pairs automatically with HA.
 
 The `rbamp-esphome` component lives in its own repository — see the
-[main rbAmp index](https://github.com/rbamp/rbamp) for links.
+[main rbAmp index](https://github.com/rb-amp/rbamp) for links.
 
 ---
 
@@ -364,9 +364,9 @@ on `dev.read*()` calls without HTTP overhead.
 
 ## Related documentation
 
-- [Examples](examples.md) — base sketches the integrations are built on
-- [Cloud Integrations](cloud-integrations.md) — AWS / Azure / GCP / external services
-- [Troubleshooting](troubleshooting.md) — MQTT broker disconnection patterns, WiFi WDT, etc.
+- [Examples](06_examples.md) — base sketches the integrations are built on
+- [Cloud Integrations](08_cloud_integrations.md) — AWS / Azure / GCP / external services
+- [Troubleshooting](10_troubleshooting.md) — MQTT broker disconnection patterns, WiFi WDT, etc.
 
 ## Related — main rbAmp documentation
 
@@ -379,4 +379,4 @@ on `dev.read*()` calls without HTTP overhead.
 
 ---
 
-[← Examples](examples.md) | [Contents](README.md) | [Cloud Integrations →](cloud-integrations.md)
+[← Examples](06_examples.md) | [Contents](README.md) | [Cloud Integrations →](08_cloud_integrations.md)

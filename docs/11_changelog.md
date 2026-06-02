@@ -100,7 +100,7 @@ These are deliberate omissions from v1.0 — tracked for v1.x or v2:
 - No explicit `setNoiseFloor()` / `setGain()` helpers — these
   registers fall under the calibration namespace (out of scope for v1
   client libraries). For bench tuning use raw `Wire` writes per
-  [Sensor Selection](sensor-selection.md#raw-nf-write-until-library-adds-a-helper).
+  [Sensor Selection](03_sensor_selection.md#raw-nf-write-until-library-adds-a-helper).
 - No reactive-power read — RESERVED for v2 (STANDARD / PRO tier feature,
   not exposed in protocol v1).
 - No dimmer control (`REG_DIM0_*` 0x10..0x18 untouched). Out of scope
@@ -171,8 +171,8 @@ Additional 12-hour SoakMonitor validation (`ard-amp-log.csv`, 145 cycles):
 
 ## Reporting issues + contributing
 
-Open issues at [github.com/rbamp/rbamp-arduino/issues](https://github.com/rbamp/rbamp-arduino/issues)
-with the diagnostic info checklist from [Troubleshooting](troubleshooting.md#when-to-escalate).
+Open issues at [github.com/rb-amp/rbamp-arduino/issues](https://github.com/rb-amp/rbamp-arduino/issues)
+with the diagnostic info checklist from [Troubleshooting](10_troubleshooting.md#when-to-escalate).
 
 Pull requests welcome — the library is in pure standard-Arduino C++,
 no platform-specific dependencies. Run the conformance test in
@@ -194,4 +194,4 @@ MIT — see [LICENSE](../LICENSE).
 
 ---
 
-[← Troubleshooting](troubleshooting.md) | [Contents](README.md)
+[← Troubleshooting](10_troubleshooting.md) | [Contents](README.md)

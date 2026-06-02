@@ -255,7 +255,7 @@ Writes `REG_CT_MODEL` (0x05) and persists via `CMD_SAVE_GAINS`
 Out-of-range `code` (0, 6+) returns `false` with `RB_ERR_PARAM`.
 
 On v1.1 firmware, the write additionally triggers preset NF + GAIN
-auto-load — see [Tier Support](tiers.md#firmware-version-gating).
+auto-load — see [Tier Support](02_tiers.md#firmware-version-gating).
 
 #### `bool saveGains() noexcept`
 
@@ -304,14 +304,14 @@ I2C General-Call broadcast LATCH — RESERVED FOR v2.
 **On v1 firmware**: always returns `false` without touching the wire
 (General-Call disabled in PY32 peripheral per SPEC §9). Callers must
 fall back to per-device sequential `latchPeriod()` — see
-[scenario 3 in 06_examples.md](examples.md#scenario-3--multi-module-monitor).
+[scenario 3 in 06_examples.md](06_examples.md#scenario-3--multi-module-monitor).
 
 ### Diagnostics
 
 #### `int8_t lastError() const noexcept`
 
 **Returns**: One of `rbamp::RB_OK` (0) or `RB_ERR_*` (negative). Updated
-on every public-API call. See [Troubleshooting](troubleshooting.md#error-codes).
+on every public-API call. See [Troubleshooting](10_troubleshooting.md#error-codes).
 
 #### `static const char* errorString(int8_t code) noexcept`
 
@@ -379,7 +379,7 @@ bool isEnabled() const noexcept;
 
 Toggle automatic integration. While disabled, `readPeriodSnapshot()`
 still works but doesn't tick the accumulator — useful when the master
-owns Wh persistence (e.g. [scenario 9 in 06_examples.md](examples.md#scenario-9--battery-deep-sleep-logger)).
+owns Wh persistence (e.g. [scenario 9 in 06_examples.md](06_examples.md#scenario-9--battery-deep-sleep-logger)).
 
 ### Internal `tick()`
 
@@ -399,7 +399,7 @@ wh[ch] += snap.avg_p[ch] * snap.master_dt_ms / 1000.0 / 3600.0
 
 ### Precision
 
-Platform-dependent — see [Hardware Setup](hardware.md#arduino-uno--mega--nano-avr-atmega328--atmega2560):
+Platform-dependent — see [Hardware Setup](04_hardware.md#arduino-uno--mega--nano-avr-atmega328--atmega2560):
 
 - ESP32 / ESP8266 / STM32duino / SAMD / RP2040: 64-bit `double` accumulator.
   Drift < 1 LSB / year at 60 s polling cadence.
@@ -477,7 +477,7 @@ namespace rbamp {
 }
 ```
 
-See [Troubleshooting](troubleshooting.md#error-codes)
+See [Troubleshooting](10_troubleshooting.md#error-codes)
 for a full diagnostic flow on each code.
 
 ## Compile-time configuration
@@ -519,8 +519,8 @@ constexpr uint16_t SETTLE_MS_FACTORY_RESET = 1500;
 
 - Doxygen-style header source: [`src/RbAmp.h`](../src/RbAmp.h)
 - Wire-level register reference: [the rbAmp protocol spec](https://www.rbamp.com/docs/modules-basic-standard-api-reference)
-- [Quickstart](quickstart.md) for first-use walkthrough
-- [Troubleshooting](troubleshooting.md) for error-code diagnostic recipes
+- [Quickstart](05_quickstart.md) for first-use walkthrough
+- [Troubleshooting](10_troubleshooting.md) for error-code diagnostic recipes
 
 ## Related — main rbAmp documentation
 
@@ -533,4 +533,4 @@ constexpr uint16_t SETTLE_MS_FACTORY_RESET = 1500;
 
 ---
 
-[← Cloud Integrations](cloud-integrations.md) | [Contents](README.md) | [Troubleshooting →](troubleshooting.md)
+[← Cloud Integrations](08_cloud_integrations.md) | [Contents](README.md) | [Troubleshooting →](10_troubleshooting.md)

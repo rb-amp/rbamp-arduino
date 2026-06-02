@@ -28,7 +28,7 @@ identical for every tier. Tier differences manifest in:
    split master-side at 5 Hz RT cadence.
 4. **Whether the reactive-power register is populated** — STANDARD / PRO
    only; library v1.0 doesn't expose it (RESERVED for v2 — see
-   [Changelog](changelog.md)).
+   [Changelog](11_changelog.md)).
 
 ## What the library exposes per tier
 
@@ -43,7 +43,7 @@ dev.topology();        // RbAmpTopology::Single / SplitPhase / ThreePhase
 
 The same code runs on any tier. For BASIC modules where you want
 bidirectional accounting at the master, follow [scenario 5 in
-06_examples.md](examples.md#scenario-5--master-side-bidirectional-accounting)
+06_examples.md](06_examples.md#scenario-5--master-side-bidirectional-accounting)
 — sample `dev.readPower(0)` at 5 Hz, split into two double-precision
 buckets.
 
@@ -137,7 +137,7 @@ if (fw >= 0x02) {
 | Solar inverter monitoring | **STANDARD UI1** | Generation side — signed reading lets you see clip / curtailment |
 | Mains + Solar + Loads dashboard | **STANDARD UI1 × 2 + BASIC UI3** | Mains bidir, solar gen-only, loads per-circuit |
 
-See [scenario 6 in 06_examples.md](examples.md#scenario-6--home-energy-balance)
+See [scenario 6 in 06_examples.md](06_examples.md#scenario-6--home-energy-balance)
 for the full home-balance recipe.
 
 ## Tier upgrade path
@@ -150,10 +150,10 @@ To migrate from BASIC to STANDARD:
 
 1. Replace the module physically.
 2. New module ships with a fresh I2C address (default `0x50`) — use
-   [scenario 10 in 06_examples.md](examples.md#scenario-10--i2c-address-change-develop-mode)
+   [scenario 10 in 06_examples.md](06_examples.md#scenario-10--i2c-address-change-develop-mode)
    to assign your old address.
 3. Calibration is per-module (NF + GAIN in flash) — re-tune per
-   [Sensor Selection](sensor-selection.md) for the new module's
+   [Sensor Selection](03_sensor_selection.md) for the new module's
    CT clamp.
 4. **Energy totals do not transfer** between modules — the chip itself
    doesn't store Wh, only the master does. After swap, restore your
@@ -163,9 +163,9 @@ To migrate from BASIC to STANDARD:
 ## Related documentation
 
 - [`_shared/tier_comparison.md`](../../../docs/_shared/tier_comparison.md) — cross-platform tier reference *(future Phase 4)*
-- [Sensor Selection](sensor-selection.md) — CT model selection
-- [Hardware Setup](hardware.md) — wiring per tier
-- [Changelog](changelog.md) — v1.0 / v1.1 feature differences
+- [Sensor Selection](03_sensor_selection.md) — CT model selection
+- [Hardware Setup](04_hardware.md) — wiring per tier
+- [Changelog](11_changelog.md) — v1.0 / v1.1 feature differences
 
 ## Related — main rbAmp documentation
 
@@ -178,4 +178,4 @@ To migrate from BASIC to STANDARD:
 
 ---
 
-[← Overview](overview.md) | [Contents](README.md) | [Sensor Selection →](sensor-selection.md)
+[← Overview](01_overview.md) | [Contents](README.md) | [Sensor Selection →](03_sensor_selection.md)

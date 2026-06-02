@@ -1,7 +1,7 @@
 # Quickstart
 
 Five-minute hello-world: install, wire, read your first measurement,
-integrate Wh. If you've already read [Hardware Setup](hardware.md)
+integrate Wh. If you've already read [Hardware Setup](04_hardware.md)
 for your host MCU, skip the wiring section.
 
 ## Prerequisites
@@ -52,7 +52,7 @@ both live + neutral — that nets out to zero). The arrow on the clamp body
 should point **into** the load.
 
 > ⚠ **Do not wire the module's `NRST` pin to your host GPIO** unless you
-> read [Hardware Setup](hardware.md#nrst-hazard) first
+> read [Hardware Setup](04_hardware.md#nrst-hazard) first
 > and accept the brick risk. Use `dev.reset()` instead.
 
 ## Step 3 — First sketch
@@ -184,7 +184,7 @@ void setup() {
 
 On **v1.1 firmware** this also triggers preset NF + GAIN auto-load.
 On v1.0 firmware, you'll additionally need to tune NF + GAIN per
-[Sensor Selection](sensor-selection.md#calibration-procedure-mandatory).
+[Sensor Selection](03_sensor_selection.md#calibration-procedure-mandatory).
 
 ## What you've learned
 
@@ -199,10 +199,10 @@ On v1.0 firmware, you'll additionally need to tune NF + GAIN per
 
 ## Next steps
 
-- [Examples](examples.md) — 10 complete scenario walkthroughs
-- [DIY Integrations](diy-integrations.md) — Home Assistant, Node-RED, OpenHAB
-- [Cloud Integrations](cloud-integrations.md) — AWS IoT, Azure, GCP, InfluxDB
-- [Troubleshooting](troubleshooting.md) — when readings don't make sense
+- [Examples](06_examples.md) — 10 complete scenario walkthroughs
+- [DIY Integrations](07_diy_integrations.md) — Home Assistant, Node-RED, OpenHAB
+- [Cloud Integrations](08_cloud_integrations.md) — AWS IoT, Azure, GCP, InfluxDB
+- [Troubleshooting](10_troubleshooting.md) — when readings don't make sense
 
 ## Related — main rbAmp documentation
 
@@ -215,4 +215,4 @@ On v1.0 firmware, you'll additionally need to tune NF + GAIN per
 
 ---
 
-[← Hardware Setup](hardware.md) | [Contents](README.md) | [Examples →](examples.md)
+[← Hardware Setup](04_hardware.md) | [Contents](README.md) | [Examples →](06_examples.md)

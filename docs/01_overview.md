@@ -229,7 +229,7 @@ filter rejects NaN / Inf / |x|>10000 on float reads.
 
 ## vs raw register API
 
-Read [docs/06_examples.md](examples.md) for full scenario walkthroughs;
+Read [docs/06_examples.md](06_examples.md) for full scenario walkthroughs;
 the key migration table:
 
 | Raw API | Library equivalent |
@@ -247,10 +247,10 @@ to a single `#include <RbAmp.h>` + constructor.
 
 ## Next steps
 
-- [Quickstart](quickstart.md) — 30-second hello-world
-- [Examples](examples.md) — 10 scenario walkthroughs
-- [API Reference](api-reference.md) — every public method
-- [Troubleshooting](troubleshooting.md) — when things don't work
+- [Quickstart](05_quickstart.md) — 30-second hello-world
+- [Examples](06_examples.md) — 10 scenario walkthroughs
+- [API Reference](09_api_reference.md) — every public method
+- [Troubleshooting](10_troubleshooting.md) — when things don't work
 
 ## Related — main rbAmp documentation
 
@@ -263,4 +263,4 @@ to a single `#include <RbAmp.h>` + constructor.
 
 ---
 
-[Contents](README.md) | [Tier Support →](tiers.md)
+[Contents](README.md) | [Tier Support →](02_tiers.md)

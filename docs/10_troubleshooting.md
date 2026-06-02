@@ -67,7 +67,7 @@ Expected output: `Found 0x50` (or whatever address you assigned).
 - Verify module supply (~3.3 V on the module's 3V3 pin, not 5 V on
   earlier-revision boards).
 - Verify the host MCU isn't holding NRST low (see
-  [Hardware Setup](hardware.md#nrst-hazard)).
+  [Hardware Setup](04_hardware.md#nrst-hazard)).
 
 **If found at unexpected address**: the module may have been re-addressed
 on a previous bench session. Update your sketch's constructor to match.
@@ -184,7 +184,7 @@ library reads `0.0 A`.
    ```
 2. Vary the load — if both readings are `0.0 A`, NF is too high.
 
-**Fix**: tune NF per [Sensor Selection](sensor-selection.md#calibration-procedure-mandatory).
+**Fix**: tune NF per [Sensor Selection](03_sensor_selection.md#calibration-procedure-mandatory).
 For SCT-013-5A on the reference burden network, the bench-verified
 optimum is **NF = 6**.
 
@@ -247,7 +247,7 @@ hours of running.
 64-bit `double` accumulator. Drift < 1 LSB / year at 60 s cadence — if
 you see > 1 % drift in a day, the cause is NOT precision:
 
-- **Calibration**: NF / GAIN not tuned per [Sensor Selection](sensor-selection.md).
+- **Calibration**: NF / GAIN not tuned per [Sensor Selection](03_sensor_selection.md).
 - **Stale snapshots dropped**: if `dev.energy().wh()` is conservative,
   some stales were dropped and you missed integration intervals. Library
   protects against double-count but not against drop-on-stale.
@@ -273,7 +273,7 @@ Cause: unbounded `while (WiFi.status() != WL_CONNECTED) delay(500)`
 trips the task WDT after ~5 s on ESP32 (default).
 
 Fix: bounded wait with restart fallback (see
-[Examples](examples.md#scenario-4--per-appliance-ui3--mqtt)):
+[Examples](06_examples.md#scenario-4--per-appliance-ui3--mqtt)):
 
 ```cpp
 uint32_t t0 = millis();
@@ -348,7 +348,7 @@ issue with the `.sal` / `.dsl` capture attached.
 ## When to escalate
 
 If you've exhausted this page and the issue persists, open an issue at
-[github.com/rbamp/rbamp-arduino/issues](https://github.com/rbamp/rbamp-arduino/issues)
+[github.com/rb-amp/rbamp-arduino/issues](https://github.com/rb-amp/rbamp-arduino/issues)
 with:
 
 - Host MCU + Arduino core version
@@ -364,7 +364,7 @@ with:
 - [`_shared/retry_discipline.md`](../../../docs/_shared/retry_discipline.md) — cross-platform SPEC §B.5 reference *(future)*
 - [`_shared/error_codes.md`](../../../docs/_shared/error_codes.md) — cross-platform error code reference *(future)*
 - [`_shared/faq_common.md`](../../../docs/_shared/faq_common.md) — cross-platform FAQ *(future)*
-- [API Reference](api-reference.md#error-codes) — full code listing
+- [API Reference](09_api_reference.md#error-codes) — full code listing
 - the rbAmp protocol spec §B.5 (see [API Reference](https://www.rbamp.com/docs/modules-basic-standard-api-reference)) — NACK + buffer-leak forensic detail
 
 ## Related — main rbAmp documentation
@@ -378,4 +378,4 @@ with:
 
 ---
 
-[← API Reference](api-reference.md) | [Contents](README.md) | [Changelog →](changelog.md)
+[← API Reference](09_api_reference.md) | [Contents](README.md) | [Changelog →](11_changelog.md)

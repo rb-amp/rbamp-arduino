@@ -115,7 +115,7 @@ UI3 RT block + period snapshot), bump retry to 5 BEFORE the include:
 #include <RbAmp.h>
 ```
 
-See [Troubleshooting](troubleshooting.md) for the full
+See [Troubleshooting](10_troubleshooting.md) for the full
 NACK + retry diagnostic flow.
 
 ### ESP8266 (NodeMCU / Wemos D1 mini)
@@ -226,7 +226,7 @@ determines the rise time, and the I2C spec needs < 300 ns at 400 kHz.
 The rbAmp module asserts `DRDY` (active LOW, open-drain) on every RT window
 commit (every ~200 ms). Use an interrupt to wake the host MCU only when
 fresh data is available — useful for the master-side bidirectional accounting
-pattern ([scenario 5 in 06_examples.md](examples.md#scenario-5--master-side-bidirectional-accounting)):
+pattern ([scenario 5 in 06_examples.md](06_examples.md#scenario-5--master-side-bidirectional-accounting)):
 
 ```cpp
 const int PIN_DRDY = 15;
@@ -261,9 +261,9 @@ The library doesn't depend on DRDY in any code path.
 ## Reference
 
 - [the rbAmp protocol spec](https://www.rbamp.com/docs/modules-basic-standard-api-reference) — module schematic, isolation, NRST hazard
-- [Quickstart](quickstart.md) — minimal hello-world wiring + sketch
-- [Examples](examples.md#scenario-5--master-side-bidirectional-accounting) — DRDY-driven example
-- [Troubleshooting](troubleshooting.md) — bus-level debugging recipes
+- [Quickstart](05_quickstart.md) — minimal hello-world wiring + sketch
+- [Examples](06_examples.md#scenario-5--master-side-bidirectional-accounting) — DRDY-driven example
+- [Troubleshooting](10_troubleshooting.md) — bus-level debugging recipes
 
 ## Related — main rbAmp documentation
 
@@ -276,4 +276,4 @@ The library doesn't depend on DRDY in any code path.
 
 ---
 
-[← Sensor Selection](sensor-selection.md) | [Contents](README.md) | [Quickstart →](quickstart.md)
+[← Sensor Selection](03_sensor_selection.md) | [Contents](README.md) | [Quickstart →](05_quickstart.md)

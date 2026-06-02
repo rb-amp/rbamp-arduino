@@ -33,7 +33,7 @@ write is required (see [§ Custom CTs](#custom-cts) below).
    NF (noise floor) clamps low currents to 0 on oversized clamps.
 3. **One clamp per channel** on UI2 / UI3 modules. All three CT clamps on
    a UI3 module must be the same `REG_CT_MODEL` — the firmware applies one
-   gain / NF set to all channels (see [v1.1 roadmap](changelog.md) Item 1
+   gain / NF set to all channels (see [v1.1 roadmap](11_changelog.md) Item 1
    for per-channel preset support).
 
 ## Configuring CT model on a fresh module
@@ -151,7 +151,7 @@ dev.saveGains();    // persists NF + GAIN to flash
 ```
 
 A `setNoiseFloor()` helper may land in library v1.1 — see
-[Changelog](changelog.md).
+[Changelog](11_changelog.md).
 
 ## CT polarity
 
@@ -202,15 +202,15 @@ firmware can't accommodate this — you get one calibration set, not three.
   I2C addresses, but independent calibration).
 
 Per-channel NF + GAIN registers are planned for v2 — see
-[Changelog](changelog.md).
+[Changelog](11_changelog.md).
 
 ## Related documentation
 
 - [`_shared/ct_models.md`](../../../docs/_shared/ct_models.md) — cross-platform CT model reference *(future)*
 - [`_shared/nf_tuning.md`](../../../docs/_shared/nf_tuning.md) — full NF-tuning recipe *(future)*
-- [Tier Support](tiers.md) — which CT clamps for which tier
-- [Hardware Setup](hardware.md) — wiring + burden resistor checks
-- [Troubleshooting](troubleshooting.md) — "I reads zero" / "PF reads zero" diagnostics
+- [Tier Support](02_tiers.md) — which CT clamps for which tier
+- [Hardware Setup](04_hardware.md) — wiring + burden resistor checks
+- [Troubleshooting](10_troubleshooting.md) — "I reads zero" / "PF reads zero" diagnostics
 
 ## Related — main rbAmp documentation
 
@@ -223,4 +223,4 @@ Per-channel NF + GAIN registers are planned for v2 — see
 
 ---
 
-[← Tier Support](tiers.md) | [Contents](README.md) | [Hardware Setup →](hardware.md)
+[← Tier Support](02_tiers.md) | [Contents](README.md) | [Hardware Setup →](04_hardware.md)
