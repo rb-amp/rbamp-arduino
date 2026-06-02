@@ -112,7 +112,7 @@ E_Wh += PERIOD_AVG_P_W × master_dt_seconds / 3600
 ```
 
 Это даёт ровно ту же временную базу для всех модулей в системе
-(см. [04_period_metering.md](https://github.com/rb-amp/rbamp-spec/blob/main/docs/04_period_metering.md) в каноническом
+(см. [04_period_metering.md](https://rbamp.com/docs/modules-basic-standard-period-metering) в каноническом
 спецификационном репо), без перерасчёта между внутренними часами устройств.
 
 Дальше:
@@ -154,7 +154,7 @@ E_Wh += PERIOD_AVG_P_W × master_dt_seconds / 3600
 | [11 · Changelog](docs/11_changelog.md) | история изменений библиотеки |
 
 Описание самого протокола обмена (общего для всех клиентских библиотек)
-живёт в репозитории [`rbamp-spec`](https://github.com/rb-amp/rbamp-spec).
+живёт в репозитории [`rbamp-spec`](https://rbamp.com/docs/modules-basic-standard-api-reference).
 
 ## Примеры
 

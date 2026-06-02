@@ -95,7 +95,7 @@ The module returns **only instantaneous and period-averaged quantities** — vol
 E_Wh += PERIOD_AVG_P_W × master_dt_seconds / 3600
 ```
 
-That gives every module in the system the same time base (see [04_period_metering.md](https://github.com/rb-amp/rbamp-spec/blob/main/docs/04_period_metering.md) in the canonical spec), with no need to reconcile internal clocks across devices.
+That gives every module in the system the same time base (see [04_period_metering.md](https://rbamp.com/docs/modules-basic-standard-period-metering) in the canonical spec), with no need to reconcile internal clocks across devices.
 
 What else:
 
@@ -121,7 +121,7 @@ What else:
 | [10 · Troubleshooting](docs/10_troubleshooting.md) | common problems and how to work through them |
 | [11 · Changelog](docs/11_changelog.md) | library release history |
 
-The wire-level protocol description (shared by all client libraries) lives in the [`rbamp-spec`](https://github.com/rb-amp/rbamp-spec) repository.
+The wire-level protocol description (shared by all client libraries) lives in the [`rbamp-spec`](https://rbamp.com/docs/modules-basic-standard-api-reference) repository.
 
 ## Examples
 
@@ -160,7 +160,7 @@ The rbAmp module wire protocol is implemented by a family of cross-platform clie
 | **ESPHome external component** | Declarative YAML integration with Home Assistant | [`rbamp-esphome`](https://github.com/rb-amp/rbamp-esphome) |
 | **STM32 HAL** | Bare HAL on STM32F1/F4/G0/G4 — no Arduino runtime, no RTOS | [`rbamp-stm32-hal`](https://github.com/rb-amp/rbamp-stm32-hal) *(coming after bench break-in + v1.2 firmware extension)* |
 
-For the wire protocol itself (registers, commands, errors, NACK discipline), see [`rbamp-spec`](https://github.com/rb-amp/rbamp-spec).
+For the wire protocol itself (registers, commands, errors, NACK discipline), see [`rbamp-spec`](https://rbamp.com/docs/modules-basic-standard-api-reference).
 
 ## License
 
