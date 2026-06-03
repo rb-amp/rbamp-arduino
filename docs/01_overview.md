@@ -125,51 +125,11 @@ API recipes live in the cross-platform reference docs at
 
 ### `begin()` flow
 
-```
-sketch          RbAmp                  Wire                 PY32 slave
-  │               │                      │                       │
-  ├─dev.begin()──►│                      │                       │
-  │               ├─readU8(REG_VERSION)─►│                       │
-  │               │                      ├──[0x50, 0x03]────────►│
-  │               │                      │◄─────────────────ACK──┤
-  │               │                      ├──[read 1 byte]───────►│
-  │               │                      │◄──────────────[0x01]──┤
-  │               │◄─────────────0x01────┤                       │
-  │               │  (firmware OK)       │                       │
-  │               │                      │                       │
-  │               ├─readFloatLE(U_RMS)──►│  (4 single-byte reads)│
-  │               │  → 226.3 V           │                       │
-  │               │  → has_voltage_hw=true                       │
-  │               │                      │                       │
-  │               ├─writeCmd(LATCH)─────►│                       │
-  │               │                      ├──[0x50, 0x01, 0x27]──►│
-  │               │  delay(50)           │                       │
-  │               │                      │                       │
-  │◄────true──────┤                      │                       │
-```
+![rbAmp Arduino begin() sequence](images/arduino-begin-flow.png)
 
 ### `readPeriodSnapshot(snap)` flow
 
-```
-sketch          RbAmp                  Wire                 PY32 slave
-  │               │                      │                       │
-  ├─readPeriodSnapshot(snap)────────────►│                       │
-  │               ├─writeCmd(LATCH)─────►│  master_t_now = now() │
-  │               │                      │                       │
-  │               │  delay(50)           │                       │
-  │               │                      │                       │
-  │               ├─readU8(PERIOD_VALID)►│                       │
-  │               │  → bit0 = 1          │                       │
-  │               │                      │                       │
-  │               ├─readFloatLE(AVG_P0)─►│ (4 single-byte reads) │
-  │               ├─readFloatLE(MAX_P0)─►│ (4 single-byte reads) │
-  │               ├─readU32LE(LATCH_MS)─►│ (4 single-byte reads) │
-  │               │                      │                       │
-  │               │  snap.master_dt_ms = now() − last_latch_ms_  │
-  │               │  energy_.tick(snap, channels_)               │
-  │               │                      │                       │
-  │◄────true──────┤                      │                       │
-```
+![rbAmp Arduino readPeriodSnapshot sequence](images/arduino-snapshot-flow.png)
 
 For the per-byte retry path (SPEC §B.5) — every single-byte read above
 internally retries up to 3 times with a 5 ms gap on ESP32 targets. Sanity
