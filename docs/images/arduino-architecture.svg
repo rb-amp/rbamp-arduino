@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1336" viewBox="0 0 760 1336" font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif">
+  <rect x="45.0" y="40.0" width="670.0" height="211.0" rx="16" ry="16" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5"/>
+  <text x="71.0" y="87.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="21" fill="#00203F" font-weight="700">User sketch (.ino)</tspan></text>
+  <rect x="71.0" y="97.0" width="618.0" height="128.0" rx="8" ry="8" fill="#f1f3f5" stroke="#f1f3f5" stroke-width="1.5"/>
+  <text x="87.0" y="122.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#00203F" font-weight="400">RbAmp</tspan><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#1a2030" font-weight="400"> dev(Wire,</tspan><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#1a2030" font-weight="400"> 0x50);</tspan></text>
+  <text x="87.0" y="147.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#1a2030" font-weight="400">dev.begin();</tspan></text>
+  <text x="87.0" y="172.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#1a2030" font-weight="400">dev.readPeriodSnapshot(snap);</tspan></text>
+  <text x="87.0" y="197.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#1a2030" font-weight="400">dev.energy().wh(0);</tspan></text>
+  <line x1="380.0" y1="251" x2="380.0" y2="298" stroke="#00203F" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 375.0 297 L 385.0 297 L 380.0 307 Z" fill="#00203F"/>
+  <rect x="45.0" y="307.0" width="670.0" height="640.0" rx="16" ry="16" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5"/>
+  <text x="71.0" y="354.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="21" fill="#00203F" font-weight="700">RbAmp class — public surface (</tspan><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="21" fill="#00203F" font-weight="700">RbAmp.h</tspan><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="21" fill="#00203F" font-weight="700">)</tspan></text>
+  <rect x="67.0" y="364.0" width="626.0" height="219.0" rx="12" ry="12" fill="#ffffff" stroke="#e3e7eb" stroke-width="1.5"/>
+  <text x="85.0" y="419.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="15.5" fill="#8a9ab0" font-weight="600">Lifecycle:</tspan></text>
+  <text x="241.0" y="419.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="14.5" fill="#00203F" font-weight="400">begin / probe / waitReady</tspan></text>
+  <text x="85.0" y="446.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="15.5" fill="#8a9ab0" font-weight="600">RT reads:</tspan></text>
+  <text x="241.0" y="446.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="14.5" fill="#00203F" font-weight="400">readVoltage / readPower / …</tspan></text>
+  <text x="85.0" y="473.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="15.5" fill="#8a9ab0" font-weight="600">Period:</tspan></text>
+  <text x="241.0" y="473.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="14.5" fill="#00203F" font-weight="400">latchPeriod / readPeriodSnapshot</tspan></text>
+  <text x="85.0" y="500.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="15.5" fill="#8a9ab0" font-weight="600">Config:</tspan></text>
+  <text x="241.0" y="500.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="14.5" fill="#00203F" font-weight="400">setCTModel / saveGains / …</tspan></text>
+  <text x="85.0" y="527.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="15.5" fill="#8a9ab0" font-weight="600">Address:</tspan></text>
+  <text x="241.0" y="527.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="14.5" fill="#00203F" font-weight="400">prepare/commitAddressChange</tspan></text>
+  <text x="85.0" y="554.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="15.5" fill="#8a9ab0" font-weight="600">Diag:</tspan></text>
+  <text x="241.0" y="554.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="14.5" fill="#00203F" font-weight="400">lastError / errorString / retryExhaustionCount /</tspan></text>
+  <text x="241.0" y="575.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="14.5" fill="#00203F" font-weight="400">…</tspan></text>
+  <line x1="380.0" y1="583" x2="380.0" y2="600" stroke="#00203F" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.45"/>
+  <path d="M 375.0 599 L 385.0 599 L 380.0 609 Z" fill="#00203F" fill-opacity="0.45"/>
+  <rect x="67.0" y="609.0" width="626.0" height="141.0" rx="12" ry="12" fill="#ffffff" stroke="#e3e7eb" stroke-width="1.5"/>
+  <text x="85.0" y="643.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#00203F" font-weight="700">Private helpers — </tspan><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="16" fill="#00203F" font-weight="700">RbAmp.cpp</tspan></text>
+  <text x="85.0" y="678.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#00203F" font-weight="400">readU8</tspan><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400"> (retry loop, SPEC §B.5)</tspan></text>
+  <text x="85.0" y="705.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#00203F" font-weight="400">readFloatLE</tspan><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400"> (loose sanity filter)</tspan></text>
+  <text x="85.0" y="732.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#00203F" font-weight="400">writeReg / writeCmd</tspan></text>
+  <line x1="380.0" y1="750" x2="380.0" y2="767" stroke="#00203F" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.45"/>
+  <path d="M 375.0 766 L 385.0 766 L 380.0 776 Z" fill="#00203F" fill-opacity="0.45"/>
+  <rect x="67.0" y="776.0" width="626.0" height="141.0" rx="12" ry="12" fill="#ffffff" stroke="#e3e7eb" stroke-width="1.5"/>
+  <text x="85.0" y="810.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#00203F" font-weight="700">Owned components:</tspan></text>
+  <circle cx="88.0" cy="840.0" r="2.5" fill="#00203F"/>
+  <text x="101.0" y="845.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#00203F" font-weight="400">RbAmpEnergy</tspan><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400"> — per-channel Wh</tspan></text>
+  <circle cx="88.0" cy="867.0" r="2.5" fill="#00203F"/>
+  <text x="101.0" y="872.0" style="white-space:pre"><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#00203F" font-weight="400">RbAmpSnapshot / RbAmpPeriodSnapshot</tspan></text>
+  <circle cx="88.0" cy="894.0" r="2.5" fill="#00203F"/>
+  <text x="101.0" y="899.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400">Constants from </tspan><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#00203F" font-weight="400">RbAmpRegisters.h</tspan></text>
+  <line x1="380.0" y1="947" x2="380.0" y2="994" stroke="#00203F" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 375.0 993 L 385.0 993 L 380.0 1003 Z" fill="#00203F"/>
+  <rect x="45.0" y="1003.0" width="670.0" height="73.0" rx="16" ry="16" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5"/>
+  <text x="71.0" y="1050.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="21" fill="#00203F" font-weight="700">Arduino Wire library — platform-native I2C</tspan></text>
+  <line x1="380.0" y1="1076" x2="380.0" y2="1123" stroke="#00203F" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 375.0 1122 L 385.0 1122 L 380.0 1132 Z" fill="#00203F"/>
+  <rect x="394.0" y="1091.0" width="90.4" height="24" rx="12" ry="12" fill="#ADEFD1"/>
+  <text x="439.2" y="1108.0" text-anchor="middle" font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="13" fill="#00203F">I²C  0x50</text>
+  <rect x="45.0" y="1132.0" width="670.0" height="164.0" rx="16" ry="16" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5"/>
+  <text x="71.0" y="1179.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="21" fill="#00203F" font-weight="700">PY32-DimmerLink slave @ 0x50</tspan></text>
+  <circle cx="74.0" cy="1211.0" r="2.5" fill="#00203F"/>
+  <text x="87.0" y="1216.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400">V03 metering pipeline (200 ms commit)</tspan></text>
+  <circle cx="74.0" cy="1238.0" r="2.5" fill="#00203F"/>
+  <text x="87.0" y="1243.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400">Period accumulator (</tspan><tspan font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#00203F" font-weight="400">CMD_LATCH_PERIOD</tspan><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400">)</tspan></text>
+  <circle cx="74.0" cy="1265.0" r="2.5" fill="#00203F"/>
+  <text x="87.0" y="1270.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400">Calibration in flash (NF + GAIN per CT model)</tspan></text>
+</svg>

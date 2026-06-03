@@ -119,59 +119,7 @@ API recipes live in the cross-platform reference docs at
 
 ## Library architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│  User sketch (.ino)                                 │
-│                                                     │
-│   RbAmp dev(Wire, 0x50);                            │
-│   dev.begin();                                      │
-│   dev.readPeriodSnapshot(snap);                     │
-│   dev.energy().wh(0);                               │
-└─────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  RbAmp class — public surface (RbAmp.h)             │
-│   ┌─────────────────────────────────────────────┐   │
-│   │  Lifecycle:  begin / probe / waitReady      │   │
-│   │  RT reads:   readVoltage / readPower / …    │   │
-│   │  Period:     latchPeriod / readPeriodSnapshot│   │
-│   │  Config:     setCTModel / saveGains / …     │   │
-│   │  Address:    prepare/commitAddressChange    │   │
-│   │  Diag:       lastError / errorString /      │   │
-│   │              retryExhaustionCount / …       │   │
-│   └─────────────────────────────────────────────┘   │
-│                       │                             │
-│                       ▼                             │
-│   ┌─────────────────────────────────────────────┐   │
-│   │  Private helpers — RbAmp.cpp                │   │
-│   │   readU8 (retry loop, SPEC §B.5)            │   │
-│   │   readFloatLE (loose sanity filter)         │   │
-│   │   writeReg / writeCmd                       │   │
-│   └─────────────────────────────────────────────┘   │
-│                       │                             │
-│                       ▼                             │
-│   ┌─────────────────────────────────────────────┐   │
-│   │  Owned components:                          │   │
-│   │   • RbAmpEnergy — per-channel Wh            │   │
-│   │   • RbAmpSnapshot / RbAmpPeriodSnapshot     │   │
-│   │   • Constants from RbAmpRegisters.h         │   │
-│   └─────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  Arduino Wire library — platform-native I2C         │
-└─────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  PY32-DimmerLink slave @ 0x50                       │
-│   • V03 metering pipeline (200 ms commit)           │
-│   • Period accumulator (CMD_LATCH_PERIOD)           │
-│   • Calibration in flash (NF + GAIN per CT model)   │
-└─────────────────────────────────────────────────────┘
-```
+![rbAmp Arduino library architecture — sketch to RbAmp class to Wire to module @0x50](images/arduino-architecture.png)
 
 ## Sequence diagrams
 
