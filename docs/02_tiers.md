@@ -56,17 +56,7 @@ pure-I* SKUs. To distinguish BASIC-UI* from STANDARD/PRO (both have
 voltage hardware), watch the **sign** of `readPower(0)` over a known-export
 load:
 
-```cpp
-// Force a small export condition (load below solar generation)
-float p = dev.readPower(0);
-if (p < 0) {
-    Serial.println(F("STANDARD or PRO (signed period accumulator works)"));
-} else if (p == 0 && load_below_solar) {
-    // Library returned 0 W but we know the load is exporting →
-    // accumulator must be unsigned (BASIC tier)
-    Serial.println(F("BASIC — use master-side bidirectional accounting"));
-}
-```
+![rbAmp tiers — BASIC vs STANDARD vs PRO comparison](images/arduino-tiers-compare.png)
 
 For installations where you don't know the tier ahead of time, the safe
 default is to assume **BASIC + master-side split** — this works on every
