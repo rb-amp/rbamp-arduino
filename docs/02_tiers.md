@@ -1,181 +1,193 @@
-# Product tiers — BASIC / STANDARD / PRO
+# 02 · Module tiers
 
-> **Shared content note**: tier semantics are identical across every
-> platform (Arduino / ESP-IDF / MicroPython / CPython / STM32-HAL). The
-> definitive reference is [`_shared/tier_comparison.md`](../../../docs/_shared/tier_comparison.md)
-> *(created in a future Phase 4 session)*. This page documents the tiers
-> from the Arduino library's perspective — what API surface each tier
-> exposes and how to detect which tier you have.
+![rbAmp product tiers: BASIC / STANDARD / PRO capability ladder](images/tier-ladder.png)
 
-## Tier overview
+## What a tier is
 
-| Tier | Voltage HW | Current channels | Period accumulator | Bidirectional energy | Notes |
-|---|---|---|---|---|---|
-| **BASIC** | optional (UI1/UI2/UI3 vs I1/I2/I3 SKUs) | 1 / 2 / 3 | unsigned (clamps negative samples to 0) | master-side only — see scenario 5 | Cheapest, intended for residential metering |
-| **STANDARD** | always present | 1 / 2 / 3 | signed (preserves negative samples — solar export visible) | native | Mid-tier, solar-with-grid use case |
-| **PRO** | always present | 3 | signed + per-channel reactive power + harmonics | native | Industrial / three-phase audit |
+**rbAmp** ships in three tiers: **BASIC**, **STANDARD**, **PRO**.
+A tier is a complete pairing of **hardware revision and firmware**, not
+a software flag. Moving between tiers requires a physical SKU change,
+not a firmware update.
 
-All three tiers expose the **same I2C register map** at v1.0 of the
-protocol. The library API surface (`readVoltage()`, `readPower(ch)`, …) is
-identical for every tier. Tier differences manifest in:
+From the perspective of the library and your code: **the `RbAmp` class
+API is identical across all tiers**. The differences show up in which
+values the module returns and how the firmware behavior interprets the
+data (in particular — export to the grid).
 
-1. **Which channels exist** — discovered via constructor topology hint
-   (v1.0 firmware) or `REG_TOPOLOGY` (v1.1 firmware, see below).
-2. **Whether voltage hardware is present** — `dev.hasVoltageHw()`.
-3. **Sign of the period-averaged power** — BASIC clamps negative; STANDARD
-   and PRO preserve sign. Affects whether you can do native bidirectional
-   accounting (`dev.energy().wh(0)` going negative on export) or need to
-   split master-side at 5 Hz RT cadence.
-4. **Whether the reactive-power register is populated** — STANDARD / PRO
-   only; library v1.0 doesn't expose it (RESERVED for v2 — see
-   [Changelog](11_changelog.md)).
+## Current status
 
-## What the library exposes per tier
+In the current rbAmp firmware, only the **BASIC** tier is implemented
+and shipping. STANDARD and PRO are on the roadmap and not implemented.
 
-```cpp
-RbAmp dev(Wire, 0x50);
-dev.begin();
+| Tier | Shipping |
+|---|---|
+| **BASIC** | ✅ yes |
+| **STANDARD** | ❌ planned |
+| **PRO** | ❌ planned |
 
-dev.channels();        // 1, 2, or 3 — set by constructor hint (v1.0) or REG_TOPOLOGY (v1.1+)
-dev.hasVoltageHw();    // true on UI* SKUs, false on I*-only SKUs
-dev.topology();        // RbAmpTopology::Single / SplitPhase / ThreePhase
-```
+## BASIC — entry tier for consumer metering
 
-The same code runs on any tier. For BASIC modules where you want
-bidirectional accounting at the master, follow [scenario 5 in
-06_examples.md](06_examples.md#scenario-5--master-side-bidirectional-accounting)
-— sample `dev.readPower(0)` at 5 Hz, split into two double-precision
-buckets.
+### Hardware
 
-## Detecting tier at runtime
+A cost-optimized analog path suited to typical household loads. The
+module includes an isolated analog front-end, an on-board power
+regulator, and factory calibration stored in flash.
 
-### BASIC vs STANDARD/PRO
+### Firmware behavior
 
-`dev.hasVoltageHw()` distinguishes UI* (voltage hardware present) from
-pure-I* SKUs. To distinguish BASIC-UI* from STANDARD/PRO (both have
-voltage hardware), watch the **sign** of `readPower(0)` over a known-export
-load:
+The logic of a classic mechanical disk meter — **the count only moves
+forward; export to the grid is not subtracted**.
 
-```cpp
-// Force a small export condition (load below solar generation)
-float p = dev.readPower(0);
-if (p < 0) {
-    Serial.println(F("STANDARD or PRO (signed period accumulator works)"));
-} else if (p == 0 && load_below_solar) {
-    // Library returned 0 W but we know the load is exporting →
-    // accumulator must be unsigned (BASIC tier)
-    Serial.println(F("BASIC — use master-side bidirectional accounting"));
-}
-```
+The three "layers" of active-power values behave differently:
 
-For installations where you don't know the tier ahead of time, the safe
-default is to assume **BASIC + master-side split** — this works on every
-tier (signed RT `readPower(0)` is always signed, only the *period
-accumulator* differs).
-
-### UI1 / UI2 / UI3 channel count
-
-#### v1.0 firmware
-
-The library cannot reliably auto-detect channel count on v1.0 firmware —
-unmapped register reads return `0x00` rather than NACK (SPEC §8). The
-constructor's `hint` is authoritative:
-
-```cpp
-RbAmp dev(Wire, 0x50);                          // defaults to ThreePhase — over-detect harmless
-RbAmp dev(Wire, 0x50, RbAmpTopology::Single);   // explicit UI1
-RbAmp dev(Wire, 0x50, RbAmpTopology::SplitPhase); // explicit UI2
-```
-
-Unused channels on a UI1 module accessed via `dev.readCurrent(2)` (with a
-THREE_PHASE hint) read `0.0 A` and contribute `0 Wh` to integration. Over-detection
-is therefore harmless — it just means your dashboards show "3 channels"
-instead of "1".
-
-#### v1.1 firmware
-
-`REG_TOPOLOGY` (0x24, R-only byte) reports the compile-time channel count.
-Read it via `dev.rawTopology()`:
-
-```cpp
-const uint8_t topo = dev.rawTopology();
-switch (topo) {
-    case 1: Serial.println(F("UI1 / I1")); break;
-    case 2: Serial.println(F("UI2 / I2")); break;
-    case 3: Serial.println(F("UI3 / I3")); break;
-    case 0: Serial.println(F("v1.0 firmware — REG_TOPOLOGY unmapped, falling back to hint")); break;
-    default: Serial.print(F("I2C error or unknown — got 0x")); Serial.println(topo, HEX);
-}
-```
-
-A future v1.1 release of the Arduino library will read `REG_TOPOLOGY`
-inside `begin()` and override the constructor hint when the firmware
-version is ≥ 0x02. Your existing `RbAmp dev(Wire, 0x50)` call benefits
-automatically — no code change needed.
-
-### Firmware version gating
-
-```cpp
-const uint8_t fw = dev.firmwareVersion();
-if (fw >= 0x02) {
-    // v1.1+ features available:
-    //  - REG_TOPOLOGY auto-detection
-    //  - CT_MODEL preset auto-load
-    //  - 5.2.E ISR race fix
-}
-```
-
-## Which tier for which use case
-
-| Use case | Recommended tier | Why |
+| Signal | Meaning | Behavior on BASIC |
 |---|---|---|
-| Single-room appliance metering | **BASIC** | One channel, no export, cheapest |
-| Whole-house consumption | **BASIC UI1** | Mains feed, unidirectional |
-| Solar + grid (sell back) | **STANDARD UI1** | Signed period accumulator — `dev.energy().wh(0)` goes negative on net export |
-| Per-appliance multi-channel | **BASIC UI3** | 3 CT clamps on 3 loads, no per-circuit export expected |
-| Three-phase industrial | **PRO** | 3 channels + reactive power + harmonics (v2 features) |
-| Solar inverter monitoring | **STANDARD UI1** | Generation side — signed reading lets you see clip / curtailment |
-| Mains + Solar + Loads dashboard | **STANDARD UI1 × 2 + BASIC UI3** | Mains bidir, solar gen-only, loads per-circuit |
+| `dev.readPower(ch)` | instantaneous RT power, updated every ~200 ms | **signed** — a negative value is visible in real time (export) |
+| `PERIOD_AVG_P_W` (inside `readPeriodSnapshot`) | average power over the period | each 200 ms window's average P is **clamped** to `max(P, 0)` before being added to the period accumulator |
+| `dev.energy().wh(ch)` | Wh accumulated by the library | **monotonic** — consumption only; export is not counted |
 
-See [scenario 6 in 06_examples.md](06_examples.md#scenario-6--home-energy-balance)
-for the full home-balance recipe.
+In other words: the user **sees** export in the RT reading, but it is
+absent from the library's Wh counter on BASIC.
 
-## Tier upgrade path
+### Typical use cases
 
-A module's tier is fixed at manufacture (analog front-end populates voltage
-hardware or not; firmware build sets `V03_N_I`). **You cannot upgrade a BASIC
-to a STANDARD in software** — the hardware is missing the voltage divider.
+- Households without on-site generation (no solar panels, wind
+  turbines, or battery systems)
+- Submeters for purely consuming loads (water heaters, motors,
+  appliances)
+- Building consumption monitoring where bidirectional metering is not
+  required
 
-To migrate from BASIC to STANDARD:
+### Bidirectional metering on BASIC (master-side)
 
-1. Replace the module physically.
-2. New module ships with a fresh I2C address (default `0x50`) — use
-   [scenario 10 in 06_examples.md](06_examples.md#scenario-10--i2c-address-change-develop-mode)
-   to assign your old address.
-3. Calibration is per-module (NF + GAIN in flash) — re-tune per
-   [Sensor Selection](03_sensor_selection.md) for the new module's
-   CT clamp.
-4. **Energy totals do not transfer** between modules — the chip itself
-   doesn't store Wh, only the master does. After swap, restore your
-   master-side total to the new `dev.energy()` accumulator via library
-   `reset()` + manual write to your own persistence store.
+If you need to track export to the grid separately on a BASIC module,
+**do it on the master side**. The RT power `dev.readPower(0)` is
+signed, so:
 
-## Related documentation
+```cpp
+double consume_wh = 0.0;
+double export_wh  = 0.0;
+uint32_t t_prev_ms = millis();
 
-- [`_shared/tier_comparison.md`](../../../docs/_shared/tier_comparison.md) — cross-platform tier reference *(future Phase 4)*
-- [Sensor Selection](03_sensor_selection.md) — CT model selection
-- [Hardware Setup](04_hardware.md) — wiring per tier
-- [Changelog](11_changelog.md) — v1.0 / v1.1 feature differences
+void loop() {
+    // Sample RT power at 5 Hz — matches the firmware-commit cadence
+    // (200 ms per channel). Faster gives empty repeat reads; slower
+    // loses resolution on abrupt load transitions. ±2 % accuracy is
+    // achievable for typical mixed loads with an inverter.
+    //
+    // delay() blocks the loop — incompatible with concurrent work
+    // (LCD refresh, MQTT, networking). For sketches with other tasks,
+    // replace it with a non-blocking millis() / scheduler pattern.
+    delay(200);
+    uint32_t t_now_ms = millis();
+    float dt_s = (t_now_ms - t_prev_ms) / 1000.0f;
+    t_prev_ms = t_now_ms;
 
-## Related — main rbAmp documentation
+    float p = dev.readPower(0);
+    if (isnan(p)) return;
 
-- [API Reference](https://www.rbamp.com/docs/modules-basic-standard-api-reference) — formal I²C register / command / error spec the library wraps
-- [Arduino Examples (raw I²C)](https://www.rbamp.com/docs/modules-basic-standard-arduino-examples) — same scenarios without the library, useful for porting
-- [Period Metering](https://www.rbamp.com/docs/modules-basic-standard-period-metering) — atomic latch concept and master-side energy formula
-- [Hardware Connection](https://www.rbamp.com/docs/modules-basic-standard-hardware-connection) — pinout, wiring, CT installation
-- [Troubleshooting](https://www.rbamp.com/docs/modules-basic-standard-troubleshooting) — module-side issues (NACK, calibration drift, bus noise)
+    double dwh = (double)p * dt_s / 3600.0;
+    if (p >= 0) consume_wh += dwh;
+    else        export_wh  += -dwh;
+}
+```
 
+A complete working example is in [06_examples.md](06_examples.md) (the
+`BidirectionalEnergy` scenario) and in [`examples/06_BidirectionalEnergy/`](https://github.com/rb-amp/rbamp-arduino/tree/main/examples/06_BidirectionalEnergy/).
 
----
+## STANDARD — bidirectional tier *(planned)*
 
-[← Overview](01_overview.md) | [Contents](README.md) | [Sensor Selection →](03_sensor_selection.md)
+> This section describes **planned** functionality. It is not
+> implemented in the current rbAmp firmware.
+
+### What will be added
+
+- **Hardware**: an extended analog stack for accurate measurement of
+  both consumption and reverse flow
+- **Firmware**: bidirectional metering — two separate per-period
+  accumulators (consumption and export), exposed separately through
+  additional registers (details after the STANDARD tier release)
+- **Library API**: `dev.energy().wh(ch)` will start returning a signed
+  net value (consumption − export) automatically, without master-side
+  tricks
+
+### Typical use cases (once available)
+
+- Homes with rooftop solar generation
+- Homes with wind turbines
+- Battery storage systems
+- Regenerative loads
+- V2G (vehicle-to-grid) EV charging
+
+## PRO — premium tier *(planned)*
+
+> This section describes **planned** functionality. It is not
+> implemented in the current rbAmp firmware.
+
+### What PRO will add
+
+- **Hardware**: a PRO-grade analog front-end (lower noise, tighter
+  linearity), premium factory calibration, optional extended channel
+  sets
+- **Firmware**: bidirectional metering (as in STANDARD) plus
+  additional diagnostic features — details in the specification after
+  the PRO tier release
+- **Library API**: extended diagnostic accessors (exact set after the
+  firmware implementation)
+
+### PRO use cases (once available)
+
+- Submeters for commercial tenants
+- Billing-grade accuracy installations
+- Test and measurement labs
+- Energy-intensive industrial loads
+
+## How to detect the tier at runtime
+
+The current firmware has no explicit "tier" register. Indirect
+indicators are available:
+
+```cpp
+// Firmware version — opaque byte
+uint8_t fw = dev.firmwareVersion();
+
+// Presence of a voltage sensor (UI* variants vs I*-only)
+bool voltage_hw = dev.hasVoltageHw();
+
+// Number of current channels (1 / 2 / 3)
+uint8_t channels = dev.channels();
+
+// Full SKU — variant byte from REG_HW_VARIANT (0x55)
+// 1=UI1, 2=UI2, 3=UI3, 4=I1, 5=I2, 6=I3
+uint8_t variant = dev.hwVariant();
+```
+
+> **Note**: the indirect indicators above give different signals (the
+> firmware version, the channel count, the presence of a voltage
+> sensor, the SKU), but **they do not give the tier** — the current
+> firmware is implicitly always **BASIC**. Use the SKU label on the
+> module's enclosure as the source of truth for the tier. An explicit
+> tier register will appear once STANDARD starts shipping.
+
+## Where tier-dependent items are flagged in the documentation
+
+Throughout the library text and the canonical documentation,
+tier-dependent features are flagged explicitly, for example:
+
+> **STANDARD / PRO only** — this register is not available on a BASIC
+> module.
+
+Or, conversely, BASIC-specific behavior:
+
+> **BASIC**: the `dev.energy().wh(ch)` counter is monotonic — export
+> to the grid is not counted. For bidirectional metering, see the
+> `BidirectionalEnergy` example or use a STANDARD/PRO module.
+
+## What's next
+
+- [03 · Current sensor selection](03_sensor_selection.md) — which
+  SCT-013 for which job
+- [04 · Wiring](04_hardware.md) — hardware details
+- [06 · Examples](06_examples.md) — scenarios for BASIC, including
+  master-side bidirectional metering
+- [09 · API reference](09_api_reference.md) — the full public API

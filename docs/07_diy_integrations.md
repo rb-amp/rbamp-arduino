@@ -1,29 +1,30 @@
-# DIY integrations
+# 07 · DIY integrations
 
-How to wire `RbAmp` readings into the common self-hosted DIY automation
-platforms. Each section shows a minimal working sketch on the ESP32 side
-and the corresponding platform-side configuration.
+How to feed `RbAmp` readings into popular self-hosted home-automation
+systems. For each platform you get a minimal working ESP32 sketch
+plus the matching configuration on the platform side.
 
-For cloud / commercial integrations (AWS IoT, Azure, GCP, InfluxDB Cloud)
-see [Cloud Integrations](08_cloud_integrations.md).
+Cloud / commercial integrations (AWS IoT, Azure, GCP, InfluxDB
+Cloud) — [08 · Cloud integrations](08_cloud_integrations.md).
 
-| Platform | Wire transport | Discovery | Code |
+| Platform | Transport | Auto-discovery | Host |
 |---|---|---|---|
-| [Home Assistant](#home-assistant-mqtt-auto-discovery) | MQTT | Auto-discovery | ESP32 |
-| [ESPHome](#esphome-via-external-component) | Native API + MQTT | YAML | ESP32 only |
-| [Node-RED](#node-red) | MQTT (or HTTP) | manual flow | any host |
-| [OpenHAB](#openhab) | MQTT (or REST) | manual `.things` file | any host |
-| [Domoticz](#domoticz) | MQTT (Auto) | Auto-discovery (Domoticz MQTT plugin) | any host |
-| [InfluxDB OSS + Grafana](#influxdb-oss--grafana) | HTTP line-protocol | none | any host |
+| Home Assistant | MQTT | yes (HA MQTT Discovery) | ESP32 |
+| ESPHome | Native API + MQTT | yes (YAML config) | ESP32 only |
+| Node-RED | MQTT (or HTTP) | manual flow | any host |
+| OpenHAB | MQTT (or REST) | manual `.things` | any host |
+| Domoticz | MQTT (auto) or HTTP | yes (MQTT plugin) | any host |
+| InfluxDB OSS + Grafana | HTTP line-protocol | no | any host |
 
 ---
 
 ## Home Assistant — MQTT Auto-discovery
 
-HA's MQTT Discovery makes the device + entities appear automatically when
-the ESP32 publishes config topics. No HA YAML edits needed.
+HA MQTT Discovery automatically creates the device and its sensors
+once the ESP32 publishes the config topics. No YAML edits in HA are
+needed.
 
-### ESP32 sketch (RbAmp + WiFi + MQTT Discovery)
+### ESP32 sketch (`RbAmp` + WiFi + MQTT Discovery)
 
 ```cpp
 #include <WiFi.h>
@@ -62,8 +63,10 @@ void publish_discovery_sensor(const char* key, const char* friendly,
         DEVICE_ID, key,
         DEVICE_ID, key, state_class,
         DEVICE_ID, DEVICE_NAME);
-    if (unit)         n += snprintf(payload+n, sizeof(payload)-n, ",\"unit_of_measurement\":\"%s\"", unit);
-    if (device_class) n += snprintf(payload+n, sizeof(payload)-n, ",\"device_class\":\"%s\"", device_class);
+    if (unit)         n += snprintf(payload+n, sizeof(payload)-n,
+                                    ",\"unit_of_measurement\":\"%s\"", unit);
+    if (device_class) n += snprintf(payload+n, sizeof(payload)-n,
+                                    ",\"device_class\":\"%s\"", device_class);
     snprintf(payload+n, sizeof(payload)-n, "}");
     mqtt.publish(topic, payload, true);
 }
@@ -83,12 +86,12 @@ void setup() {
     while (WiFi.status() != WL_CONNECTED) delay(500);
     mqtt.setServer("192.168.1.10", 1883);
     mqtt.setKeepAlive(60);
-    mqtt.setBufferSize(1024);   // big enough for one discovery payload
+    mqtt.setBufferSize(1024);   // enough for one discovery payload
     mqtt.connect(DEVICE_ID);
     publish_discovery_all();
 
     Wire.begin();
-    Wire.setClock(50000);       // SPEC §B.5 on ESP32
+    Wire.setClock(50000);       // ESP32 baseline mitigation — see 10 · Troubleshooting
     dev.setLogStream(&Serial);
     while (!dev.begin()) { delay(500); }
 }
@@ -119,18 +122,20 @@ void loop() {
 
 ### Result in HA
 
-Within seconds of the first publish, HA auto-creates a device "Mains rbAmp"
-with 6 entities (Voltage, Current, Power, Energy, Frequency, Power Factor).
-The Energy entity has `state_class: total_increasing` and the right
-`device_class`, so HA's Energy dashboard accepts it as a consumption
-source.
+A few seconds after the first publish, HA automatically creates a
+device named "Mains rbAmp" with 6 sensors (Voltage, Current,
+Power, Energy, Frequency, Power Factor). The Energy sensor carries
+`state_class: total_increasing` and the correct `device_class` —
+the HA Energy Dashboard accepts it as a consumption source.
 
-To remove the entity from HA later, publish an empty payload to its
-`homeassistant/sensor/.../config` topic (retained).
+To remove the device from HA later, publish an empty payload to
+`homeassistant/sensor/.../config` (the retained flag clears the
+record).
 
 ### Multi-channel UI3
 
-Repeat `publish_discovery_sensor()` with suffixed keys for channel 1 + 2:
+Repeat the `publish_discovery_sensor()` calls with suffixed keys for
+channels 1 and 2:
 
 ```cpp
 publish_discovery_sensor("current_1", "Current 1", "A",  "current", "measurement");
@@ -139,16 +144,16 @@ publish_discovery_sensor("energy_1",  "Energy 1",  "Wh", "energy",  "total_incre
 // ...same for _2
 ```
 
-And expand the state JSON with `"current_1"`, `"power_1"`, `"energy_1"`
-fields populated from `dev.readCurrent(1)` / `snap.avg_p[1]` /
+Then extend the state JSON with the fields `"current_1"`, `"power_1"`,
+`"energy_1"`, populated from `dev.readCurrent(1)` / `snap.avg_p[1]` /
 `dev.energy().wh(1)`.
 
 ---
 
-## ESPHome via external component
+## ESPHome via an external component
 
-If you run ESPHome (and not bare ESP-IDF / arduino-esp32), there's a
-dedicated `rbamp` external component — install via:
+If your ESP32 already runs ESPHome (rather than bare ESP-IDF /
+arduino-esp32), there is a dedicated `rbamp` external component:
 
 ```yaml
 external_components:
@@ -159,7 +164,7 @@ external_components:
 i2c:
   sda: 21
   scl: 22
-  frequency: 50kHz       # SPEC §B.5 mandate
+  frequency: 50kHz       # see 10 · Troubleshooting on baseline mitigation
 
 sensor:
   - platform: rbamp
@@ -179,11 +184,12 @@ sensor:
       name: "rbAmp Power Factor"
 ```
 
-That replaces the entire Arduino sketch above. ESPHome ships native HA
-integration over the ESPHome API (not MQTT) — pairs automatically with HA.
+This replaces the entire Arduino sketch above wholesale. ESPHome
+integrates natively with HA over the ESPHome API (not MQTT) — the
+device shows up in HA automatically after flashing.
 
-The `rbamp-esphome` component lives in its own repository — see the
-[main rbAmp index](https://github.com/rb-amp/rbamp) for links.
+The `rbamp-esphome` component lives in a separate repository — see
+the [rbAmp main index](https://github.com/rb-amp/rbamp) for links.
 
 ---
 
@@ -216,18 +222,18 @@ Subscribe to the ESP32's MQTT topic in a flow:
 ]
 ```
 
-Wire `rbamp_in → extract_power → rbamp_chart` for a real-time power chart.
-Similar for energy / voltage / PF.
+Wire up `rbamp_in → extract_power → rbamp_chart` and you get a
+real-time power chart. Do the same for energy / voltage / PF.
 
-For Node-RED dashboards on the same Pi as the broker, set the MQTT host to
-`localhost`. For remote brokers, use `192.168.X.Y:1883` and add credentials
-if your broker requires auth.
+If Node-RED runs on the same Pi as the MQTT broker, set the host to
+`localhost`. For remote brokers, use `192.168.X.Y:1883` plus
+credentials if the broker requires auth.
 
 ---
 
 ## OpenHAB
 
-OpenHAB 4.x + the MQTT binding:
+OpenHAB 4.x + MQTT binding:
 
 ```text
 # things/rbamp.things
@@ -244,24 +250,26 @@ Bridge mqtt:broker:local "MQTT Broker" [ host="192.168.1.10", port=1883 ] {
 
 ```text
 # items/rbamp.items
-Number:ElectricPotential rbAmp_Voltage "Voltage [%.1f V]" <energy> { channel="mqtt:topic:local:rbamp_main:voltage" }
-Number:ElectricCurrent   rbAmp_Current "Current [%.3f A]" <energy> { channel="mqtt:topic:local:rbamp_main:current" }
-Number:Power             rbAmp_Power   "Power   [%.1f W]" <energy> { channel="mqtt:topic:local:rbamp_main:power" }
+Number:ElectricPotential rbAmp_Voltage "Voltage [%.1f V]"  <energy> { channel="mqtt:topic:local:rbamp_main:voltage" }
+Number:ElectricCurrent   rbAmp_Current "Current [%.3f A]"  <energy> { channel="mqtt:topic:local:rbamp_main:current" }
+Number:Power             rbAmp_Power   "Power   [%.1f W]"  <energy> { channel="mqtt:topic:local:rbamp_main:power" }
 Number:Energy            rbAmp_Energy  "Energy  [%.3f Wh]" <energy> { channel="mqtt:topic:local:rbamp_main:energy" }
 ```
 
-Reuse the Arduino sketch from § Home Assistant above — same JSON payload,
-just different consumer.
+The Arduino sketch is the same one from the Home Assistant section
+above. The JSON payload is shared; only the consumer differs.
 
 ---
 
 ## Domoticz
 
-Domoticz's MQTT Auto-discovery plugin understands the same `homeassistant/...`
-discovery topics. Enable the plugin in Domoticz settings, then publish from
-the ESP32 sketch unchanged — the device appears in Domoticz like in HA.
+The MQTT Auto-discovery plugin in Domoticz understands the same
+`homeassistant/...` discovery topics. Enable the plugin in the
+Domoticz settings, and the ESP32 sketch from the HA section above
+will automatically register the device in Domoticz just as it does
+in HA.
 
-For native Domoticz HTTP API instead of MQTT:
+The alternative is the native Domoticz HTTP API:
 
 ```cpp
 #include <HTTPClient.h>
@@ -279,25 +287,25 @@ void publish_to_domoticz(int idx, float power, double e_wh) {
     if (code != 200) Serial.printf("domoticz HTTP %d\n", code);
 }
 
-// In your 60 s loop:
+// In your 60-second loop:
 publish_to_domoticz(123 /* your idx */, snap.avg_p[0], dev.energy().wh(0));
 ```
 
-Create the device in Domoticz UI with type **General → kWh** (incremental
-counter), get its idx, hardcode it in the sketch.
+Create a device in the Domoticz UI of type **General → kWh**
+(incremental counter), get its idx, and hard-code it into the sketch.
 
 ---
 
 ## InfluxDB OSS + Grafana
 
-Push line-protocol points to InfluxDB directly from the ESP32:
+Write line-protocol points to InfluxDB straight from the ESP32:
 
 ```cpp
 #include <HTTPClient.h>
 
-#define INFLUX_HOST "192.168.1.30:8086"
-#define INFLUX_ORG  "homelab"
-#define INFLUX_BKT  "energy"
+#define INFLUX_HOST  "192.168.1.30:8086"
+#define INFLUX_ORG   "homelab"
+#define INFLUX_BKT   "energy"
 #define INFLUX_TOKEN "your-token-here"
 
 void push_influx(float u, float p, double e_wh) {
@@ -318,14 +326,15 @@ void push_influx(float u, float p, double e_wh) {
     if (code != 204) Serial.printf("influx HTTP %d\n", code);
 }
 
-// In your 60 s loop:
+// In your 60-second loop:
 RbAmpPeriodSnapshot snap;
 if (dev.readPeriodSnapshot(snap)) {
     push_influx(dev.readVoltage(), snap.avg_p[0], dev.energy().wh(0));
 }
 ```
 
-In Grafana, add the InfluxDB data source, then a panel with Flux query:
+In Grafana, add an InfluxDB data source, then a panel with a Flux
+query:
 
 ```text
 from(bucket: "energy")
@@ -334,7 +343,7 @@ from(bucket: "energy")
   |> filter(fn: (r) => r._field == "power")
 ```
 
-For a long-running deployment, also push the diagnostic counters:
+For a long soak deployment, also push diagnostic counters:
 
 ```cpp
 snprintf(body, sizeof(body),
@@ -343,40 +352,31 @@ snprintf(body, sizeof(body),
 // ...push to InfluxDB...
 ```
 
-so you can chart bus health alongside the energy data.
+— and you get a bus-health chart alongside the energy data.
 
 ---
 
-## Multi-platform — fan-out from one ESP32
+## Multi-platform — fan-out from a single ESP32
 
-If you want both HA Auto-discovery AND InfluxDB AND Node-RED, just publish
-the state JSON once to MQTT and let each consumer subscribe to
-`rbamp/+/state`. The ESP32 only needs the MQTT path — the broker fans
-out to all subscribers. Don't push to N HTTP endpoints from the ESP32
-directly; that ties the device to specific consumers.
+If you need HA Auto-discovery, InfluxDB, and Node-RED all at once,
+publish the state JSON once to MQTT and let each consumer subscribe
+to `rbamp/+/state`. The ESP32 talks only to the MQTT broker — the
+broker handles the fan-out to subscribers. Do not push from the
+ESP32 to N HTTP endpoints directly: that couples the device to
+specific consumers.
 
-For very high-rate streaming (5 Hz RT), use a sidecar Python script on the
-Pi running the broker — subscribe to a high-rate topic, decimate, and
-publish to the slower consumers. The ESP32's I2C loop should stay focused
-on `dev.read*()` calls without HTTP overhead.
-
----
-
-## Related documentation
-
-- [Examples](06_examples.md) — base sketches the integrations are built on
-- [Cloud Integrations](08_cloud_integrations.md) — AWS / Azure / GCP / external services
-- [Troubleshooting](10_troubleshooting.md) — MQTT broker disconnection patterns, WiFi WDT, etc.
-
-## Related — main rbAmp documentation
-
-- [API Reference](https://www.rbamp.com/docs/modules-basic-standard-api-reference) — formal I²C register / command / error spec the library wraps
-- [Arduino Examples (raw I²C)](https://www.rbamp.com/docs/modules-basic-standard-arduino-examples) — same scenarios without the library, useful for porting
-- [Period Metering](https://www.rbamp.com/docs/modules-basic-standard-period-metering) — atomic latch concept and master-side energy formula
-- [Hardware Connection](https://www.rbamp.com/docs/modules-basic-standard-hardware-connection) — pinout, wiring, CT installation
-- [Troubleshooting](https://www.rbamp.com/docs/modules-basic-standard-troubleshooting) — module-side issues (NACK, calibration drift, bus noise)
-
+For a very high-rate stream (5 Hz RT), run a sidecar Python script
+on the Pi that hosts the broker — subscribe to the fast topic,
+decimate, and republish to the slow topics. The ESP32 I²C loop
+should stay focused on the `dev.read*()` calls without HTTP overhead.
 
 ---
 
-[← Examples](06_examples.md) | [Contents](README.md) | [Cloud Integrations →](08_cloud_integrations.md)
+## Links
+
+- [06 · Examples](06_examples.md) — the baseline sketches these
+  integrations build on
+- [08 · Cloud integrations](08_cloud_integrations.md) — AWS / Azure /
+  GCP / external services
+- [10 · Troubleshooting](10_troubleshooting.md) — MQTT-disconnect,
+  WiFi WDT, TLS heap, etc. patterns
