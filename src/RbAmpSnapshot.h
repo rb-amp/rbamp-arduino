@@ -19,17 +19,42 @@
 #include <stdint.h>
 
 /**
- * @brief Variant topology — populated by RbAmp::begin() via NACK probe.
+ * @brief Variant topology — populated by RbAmp::begin() from REG_HW_VARIANT (0x55).
  *
  * Reflects how many independent current channels the device firmware exposes.
- * Voltage hardware presence is a separate flag (RbAmpSnapshot::has_voltage_hw).
+ * Voltage hardware presence is a separate flag (RbAmpSnapshot::has_voltage_hw)
+ * — also derived from the variant byte on v1.2+ (0x01..0x03 = with U,
+ * 0x04..0x06 = no U). On v1.0/v1.1 firmware the variant byte reads 0x00 (it
+ * lives in the legacy CS_INTERVAL_L slot) and begin() falls back to the
+ * constructor hint + a U_RMS threshold for hasVoltageHw().
  *
- * @see SPEC §8 — Variant auto-detection.
+ * @see truth-doc §1 — Detection / variant identification.
  */
 enum class RbAmpTopology : uint8_t {
     Single      = 1,   /**< 1 current channel (UI1 / I1). */
     SplitPhase  = 2,   /**< 2 current channels (UI2 / I2). */
     ThreePhase  = 3,   /**< 3 current channels (UI3 / I3). */
+};
+
+/**
+ * @brief Hardware SKU variant — authoritative value of REG_HW_VARIANT (0x55).
+ *
+ * Each SKU encodes both the channel count AND voltage-sensing presence in one
+ * byte. @c readVariant() returns this; @c begin() uses it to set topology +
+ * hasVoltageHw() directly. v1.0/v1.1 firmware returns 0x00 here (the register
+ * is unmapped) → @c Unknown, and the library falls back to the constructor
+ * topology hint + a U_RMS threshold for voltage detection.
+ *
+ * @see truth-doc §1.2 — Detection / variant identification.
+ */
+enum class RbAmpVariant : uint8_t {
+    Unknown = 0,   /**< Not identified (v1.0/v1.1 firmware, or non-rbAmp device). */
+    UI1     = 1,   /**< 1 current + voltage + power. */
+    UI2     = 2,   /**< 2 current + voltage + power. */
+    UI3     = 3,   /**< 3 current + voltage + power. */
+    I1      = 4,   /**< 1 current only (no voltage / power). */
+    I2      = 5,   /**< 2 current only. */
+    I3      = 6,   /**< 3 current only. */
 };
 
 /**
@@ -53,23 +78,42 @@ enum class RbAmpSensorClass : uint8_t {
  * @brief Typed enumeration of SCT-013 models — replaces the magic-int
  *        @c code argument to setCTModel().
  *
- * Both signed forms remain available:
- *  - @c setCTModel(uint8_t code) — legacy 1..5 form
+ * Both forms remain available:
+ *  - @c setCTModel(uint8_t code) — legacy numeric form
  *  - @c setCTModel(RbAmpCTModel model) — typed form (recommended)
  *
- * The numeric values match the wire-level @c REG_CT_MODEL encoding so
+ * The numeric values match the wire-level @c REG_CT_MODEL SKU encoding so
  * the typed overload is a thin static_cast wrapper with no runtime cost.
  *
- * @see SPEC §10, registers.yaml REG_CT_MODEL.
+ * @warning Per-class validation (A1): only a NON-contiguous subset of these
+ *          SKUs is characterised for the @c Sct013 sensor class —
+ *          @c {005, 010, 030, 050, 020}. @c Sct013_100 and @c Sct013_060 are
+ *          recognised SKUs but UNCHARACTERISED (no bench calibration) and are
+ *          rejected by setCTModel()/configureChannels() with @c RB_ERR_PARAM,
+ *          and by the firmware with @c ERR_PARAM. The firmware is the ultimate
+ *          authority; the library fast-fails before burning a flash cycle.
+ *
+ * @see SPEC §10, truth-doc §7.
  */
 enum class RbAmpCTModel : uint8_t {
     Unset       = 0,   /**< Default after factory reset; setCTModel() refused on v1.2+. */
-    Sct013_005  = 1,   /**< SCT-013-005A — 5 A clamp. */
-    Sct013_010  = 2,   /**< SCT-013-010 — 10 A clamp. */
-    Sct013_030  = 3,   /**< SCT-013-030 — 30 A clamp. */
-    Sct013_050  = 4,   /**< SCT-013-050 — 50 A clamp. */
-    Sct013_100  = 5,   /**< SCT-013-100 — 100 A clamp. */
+    Sct013_005  = 1,   /**< SCT-013-005A — 5 A clamp. (characterised) */
+    Sct013_010  = 2,   /**< SCT-013-010 — 10 A clamp. (characterised) */
+    Sct013_030  = 3,   /**< SCT-013-030 — 30 A clamp. (characterised) */
+    Sct013_050  = 4,   /**< SCT-013-050 — 50 A clamp. (characterised) */
+    Sct013_100  = 5,   /**< SCT-013-100 — 100 A clamp. UNCHARACTERISED → rejected. */
+    Sct013_020  = 6,   /**< SCT-013-020 — 20 A clamp. (characterised) */
+    Sct013_060  = 7,   /**< SCT-013-060 — 60 A clamp. UNCHARACTERISED → rejected. */
 };
+
+/** @name Per-field implausible bits (RbAmpSnapshot::implausible). */
+/**@{*/
+static const uint8_t RBAMP_FIELD_VOLTAGE   = 1u << 0;
+static const uint8_t RBAMP_FIELD_CURRENT   = 1u << 1;
+static const uint8_t RBAMP_FIELD_POWER     = 1u << 2;
+static const uint8_t RBAMP_FIELD_PF        = 1u << 3;
+static const uint8_t RBAMP_FIELD_FREQUENCY = 1u << 4;
+/**@}*/
 
 /**
  * @brief Real-time metering snapshot — one full read of the V03 RT register block.
@@ -80,6 +124,10 @@ enum class RbAmpCTModel : uint8_t {
  *
  * Channel indices 0/1/2 map to I0/I1/I2 on the device. Indices beyond
  * @c channels are zeroed.
+ *
+ * A field that reads but fails the physical sanity filter is set to @c NAN and
+ * its bit flagged in @c implausible — the rest of the snapshot stays usable.
+ * Only a transport failure makes readAll() return @c false.
  */
 struct RbAmpSnapshot {
     float voltage;          /**< RMS voltage at REG_V03_U_RMS (0x86) in V. */
@@ -92,6 +140,7 @@ struct RbAmpSnapshot {
     RbAmpTopology topology; /**< Variant detected at begin(). */
     uint8_t channels;       /**< 1..3 — number of valid channels in arrays. */
     bool has_voltage_hw;    /**< true if device has voltage sensing hardware. */
+    uint8_t implausible;    /**< Bitmask of fields set NaN by the sanity filter (RBAMP_FIELD_*). */
 };
 
 /**

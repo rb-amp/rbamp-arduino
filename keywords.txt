@@ -12,6 +12,12 @@ RbAmpSnapshot	KEYWORD1
 RbAmpPeriodSnapshot	KEYWORD1
 RbAmpEnergy	KEYWORD1
 RbAmpTopology	KEYWORD1
+RbAmpVariant	KEYWORD1
+RbAmpSensorClass	KEYWORD1
+RbAmpCTModel	KEYWORD1
+RbAmpFleet	KEYWORD1
+RbAmpFleetSync	KEYWORD1
+RbAmpFleetPoll	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -40,21 +46,63 @@ readPeriodMaxPower	KEYWORD2
 readPeriodLatchMs	KEYWORD2
 readPeriodSnapshot	KEYWORD2
 energy	KEYWORD2
+setSensorClass	KEYWORD2
 setCTModel	KEYWORD2
+configureChannels	KEYWORD2
 saveGains	KEYWORD2
+saveUserConfig	KEYWORD2
 prepareAddressChange	KEYWORD2
 commitAddressChange	KEYWORD2
 factoryReset	KEYWORD2
 reset	KEYWORD2
 broadcastLatch	KEYWORD2
+broadcastLatchGroup	KEYWORD2
+rawTopology	KEYWORD2
+readVariant	KEYWORD2
+readCapability	KEYWORD2
+readProductId	KEYWORD2
+readUid	KEYWORD2
+readLastError	KEYWORD2
+readEventFlags	KEYWORD2
+clearEventFlags	KEYWORD2
+hasError	KEYWORD2
+clearError	KEYWORD2
+enableGc	KEYWORD2
+readFleetConfig	KEYWORD2
+setGroupId	KEYWORD2
+readGroupId	KEYWORD2
+readGcTick	KEYWORD2
+readLabel	KEYWORD2
+writeLabel	KEYWORD2
+readActiveAddress	KEYWORD2
 lastError	KEYWORD2
 errorString	KEYWORD2
 setLogStream	KEYWORD2
+retryExhaustionCount	KEYWORD2
+sanityRejectCount	KEYWORD2
+resetCounters	KEYWORD2
 tick	KEYWORD2
 wh	KEYWORD2
 resetAll	KEYWORD2
 disable	KEYWORD2
 enable	KEYWORD2
+droppedDtCount	KEYWORD2
+resetDroppedDtCount	KEYWORD2
+scan	KEYWORD2
+count	KEYWORD2
+find	KEYWORD2
+pollAll	KEYWORD2
+enableGcAll	KEYWORD2
+gcLatch	KEYWORD2
+checkSync	KEYWORD2
+totalPower	KEYWORD2
+totalEnergyWh	KEYWORD2
+pollErrors	KEYWORD2
+assignAddress	KEYWORD2
+checkConflict	KEYWORD2
+provision	KEYWORD2
+excludedCount	KEYWORD2
+excludedAddr	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)

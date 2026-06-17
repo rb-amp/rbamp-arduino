@@ -15,6 +15,14 @@
  *   E_Wh[ch] += avg_p_W * dt_s / 3600;
  * @endcode
  *
+ * @note The @c dt is the MASTER's wall-clock (millis), NOT the chip's
+ *       @c REG_V03_PERIOD_LATCH_MS (0xEC). The chip timer under-counts ~25-30 %
+ *       under load (SysTick starvation, hardware-confirmed) and is diagnostic
+ *       only. Future maintainers / sister-lib ports: do NOT revert energy to the
+ *       chip latch_ms — it is a known billing regression. On a stale period the
+ *       integration anchor is held (RbAmp::readPeriodSnapshot) so the next valid
+ *       window covers the full elapsed interval.
+ *
  * On platforms with double-precision floating point (ESP32, ESP8266, STM32
  * Arduino core) the accumulator stores 64-bit @c double — drift is negligible.
  * On classic AVR the toolchain defines @c double as 32-bit (== @c float);
@@ -101,9 +109,28 @@ public:
      */
     bool isEnabled() const noexcept { return enabled_; }
 
+    /**
+     * @brief Count of tick() calls where dt exceeded the 1 h sanity clamp.
+     *
+     * Increments when a snapshot arrives with @c master_dt_ms > 3 600 000
+     * (loop paused, deep sleep, millis() wrap, debugger break). The Wh delta
+     * is dropped to avoid silently injecting a spurious multi-hour spike, but
+     * the user previously had no way to detect the drop. Reset via
+     * @c resetDroppedDtCount().
+     *
+     * @return Count of dropped long-dt ticks since construction or last reset.
+     */
+    uint32_t droppedDtCount() const noexcept { return dropped_dt_count_; }
+
+    /**
+     * @brief Zero the dropped-dt diagnostic counter.
+     */
+    void resetDroppedDtCount() noexcept { dropped_dt_count_ = 0; }
+
 private:
-    double  wh_[3];   /**< Per-channel Wh accumulator. */
-    bool    enabled_; /**< Master switch for tick(). */
+    double   wh_[3];              /**< Per-channel Wh accumulator. */
+    bool     enabled_;            /**< Master switch for tick(). */
+    uint32_t dropped_dt_count_;   /**< Diagnostic: tick() calls clamped on dt > 1 h. */
 };
 
 #endif /* RBAMP_ENERGY_H */

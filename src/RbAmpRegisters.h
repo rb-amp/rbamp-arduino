@@ -15,8 +15,8 @@
 
 namespace rbamp {
 
-static constexpr uint32_t RBAMP_REG_SCHEMA_CRC32 = 0x53BC3606U;
-static constexpr uint16_t RBAMP_PROTOCOL_VERSION = 0x0133U; // MAJOR.MINOR packed, e.g. 1.0 -> 0x0100
+static constexpr uint32_t RBAMP_REG_SCHEMA_CRC32 = 0x8D38A1C2U;
+static constexpr uint16_t RBAMP_PROTOCOL_VERSION = 0x014CU; // MAJOR.MINOR packed, e.g. 1.0 -> 0x0100
 
 // ---- Register addresses ----
 static constexpr uint8_t REG_STATUS                     = 0x00; // bit0=READY, bit1=ERROR
@@ -45,7 +45,10 @@ static constexpr uint8_t REG_CALIBRATION                = 0x23; // 0=in progress
 static constexpr uint8_t REG_TOPOLOGY                   = 0x24; // v1.1+: 1=SINGLE, 2=SPLIT_PHASE, 3=THREE_PHASE. v1.0 firmware returns 0x00 (unmapped) — library falls back to constructor hint.
 static constexpr uint8_t REG_SENSOR_CLASS               = 0x25; // v1.2+: 0=UNSET, 1=SCT-013, 2=WIRED_CT, 3=BUILTIN_CT. Required before REG_CT_MODEL write (else ERR_PARAM). Class change resets CT_MODEL=0. Save via CMD_SAVE_GAINS.
 static constexpr uint8_t REG_V03_PHASE_FRACT            = 0x26; // v1.2+: Q8 fractional sample shift (0..255 = 0..0.996 sample) combined with V03_PHASE_SAMPLES for sub-sample phase comp. Save via CMD_SAVE_GAINS. Calibrated on inductive bench fixture only.
-static constexpr uint8_t REG_I2C_ADDRESS                = 0x30; // Slave address (0x08..0x77). Gate behind MODE==develop; save via CMD_SAVE_GAINS; reset to apply.
+static constexpr uint8_t REG_FLEET_CONFIG               = 0x27; // bit0=GC_ENABLE (General-Call broadcast latch reception). Persist via CMD_SAVE_USER_CONFIG; effective after reset.
+static constexpr uint8_t REG_GROUP_ID                   = 0x28; // GC latch group filter. GC frame group byte 0x00=all-call; else must match this. Persist via CMD_SAVE_USER_CONFIG.
+static constexpr uint8_t REG_I2C_ADDRESS                = 0x30; // Slave address (0x08..0x77). Change via two-phase commit: write candidate here (RAM) -> arm 0xA5 to ADDR_COMMIT_MAGIC -> CMD_COMMIT_ADDR -> CMD_RESET. Production-OK (not develop-gated).
+static constexpr uint8_t REG_ADDR_COMMIT_MAGIC          = 0x31; // Write 0xA5 to arm CMD_COMMIT_ADDR; consumed on commit; reads 0x00.
 static constexpr uint8_t REG_TEMP_T_WARN                = 0x36; // Warning threshold
 static constexpr uint8_t REG_TEMP_T_DERATE              = 0x37; // Derate threshold
 static constexpr uint8_t REG_TEMP_T_CRIT                = 0x38; // Critical threshold
@@ -63,7 +66,7 @@ static constexpr uint8_t REG_FAN_TARGET                 = 0x51; // Manual target
 static constexpr uint8_t REG_FAN_MODE                   = 0x52; // 0=OFF, 1=AUTO, 2=MANUAL, 3=HYBRID, 4=FULL
 static constexpr uint8_t REG_FAN_STATUS                 = 0x53; // Status flags
 static constexpr uint8_t REG_CS_CONFIG                  = 0x54; // bit0 = CH0 enable (backward compat)
-static constexpr uint8_t REG_CS_INTERVAL_L              = 0x55; // No-op (kept for compat)
+static constexpr uint8_t REG_HW_VARIANT                 = 0x55; // Hardware SKU: 1=UI1, 2=UI2, 3=UI3, 4=I1, 5=I2, 6=I3. Authoritative variant detection (do NOT NACK-probe channel registers).
 static constexpr uint8_t REG_CS_INTERVAL_H              = 0x56; // No-op (kept for compat)
 static constexpr uint8_t REG_CS0_SENSOR_TYPE            = 0x57; // ACS712 sensitivity (e.g. 66 = ACS712-30A)
 static constexpr uint8_t REG_ACC_SEL                    = 0x58; // Select accumulator 0..7 for register window
@@ -177,11 +180,13 @@ static constexpr uint8_t CMD_LATCH_PERIOD               = 0x27;
 static constexpr uint8_t CMD_SET_CT_MODEL_CH0           = 0x28;
 static constexpr uint8_t CMD_SET_CT_MODEL_CH1           = 0x29;
 static constexpr uint8_t CMD_SET_CT_MODEL_CH2           = 0x2A;
+static constexpr uint8_t CMD_COMMIT_ADDR                = 0x30;
+static constexpr uint8_t CMD_SAVE_USER_CONFIG           = 0x32;
 static constexpr uint8_t CMD_FACTORY_RESET              = 0xAA;
 
 // ---- Command settle times (ms) ----
 static constexpr uint16_t SETTLE_MS_NOP                    = 0;
-static constexpr uint16_t SETTLE_MS_RESET                  = 100;
+static constexpr uint16_t SETTLE_MS_RESET                  = 300;
 static constexpr uint16_t SETTLE_MS_RECALIBRATE            = 200;
 static constexpr uint16_t SETTLE_MS_SWITCH_UART            = 50;
 static constexpr uint16_t SETTLE_MS_CHARGE_RESET           = 5;
@@ -196,6 +201,8 @@ static constexpr uint16_t SETTLE_MS_LATCH_PERIOD           = 50;
 static constexpr uint16_t SETTLE_MS_SET_CT_MODEL_CH0       = 5;
 static constexpr uint16_t SETTLE_MS_SET_CT_MODEL_CH1       = 5;
 static constexpr uint16_t SETTLE_MS_SET_CT_MODEL_CH2       = 5;
+static constexpr uint16_t SETTLE_MS_COMMIT_ADDR            = 700;
+static constexpr uint16_t SETTLE_MS_SAVE_USER_CONFIG       = 700;
 static constexpr uint16_t SETTLE_MS_FACTORY_RESET          = 1500;
 
 // ---- Device error codes ----

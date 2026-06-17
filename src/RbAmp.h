@@ -61,7 +61,8 @@
 #include <Wire.h>
 #include <stdint.h>
 
-#include "RbAmpRegisters.h"  /* auto-generated; do not edit */
+#include "RbAmpRegisters.h"    /* auto-generated; do not edit — namespace rbamp:: (V1 bridge) */
+#include "RbAmpRegistersV2.h" /* auto-generated; do not edit — namespace rbamp::v2:: (v1.3 surface) */
 #include "RbAmpSnapshot.h"
 #include "RbAmpEnergy.h"
 
@@ -91,21 +92,23 @@ public:
      *
      * @param[in] bus  Wire bus reference. Caller must call @c bus.begin() before begin().
      * @param[in] addr 7-bit slave address (default 0x50). Range 0x08..0x77.
-     * @param[in] hint Topology hint for begin(). Default @c ThreePhase — the
-     *                 v1 rbAmp firmware does NOT NACK unmapped register reads
-     *                 (SPEC §8), so begin() cannot reliably auto-detect variant.
-     *                 Unused channels harmlessly read 0.0 A in the snapshot.
-     *                 Override only when you know the SKU at compile-time
-     *                 (e.g. @c RbAmpTopology::Single for the UI1 variant).
+     * @param[in] hint Topology hint for begin() — used ONLY as fallback when
+     *                 the variant byte @c REG_HW_VARIANT (0x55) is not exposed
+     *                 by the firmware. Default @c Single keeps the safe path
+     *                 on v1.0 (unmapped variant byte → no spurious polls on
+     *                 channels 1-2 of a UI1 SKU). Override when you know the
+     *                 SKU at compile-time and want a non-Single default for
+     *                 pre-v1.2 firmware.
      *
-     * @note v1.1 firmware will expose @c REG_TOPOLOGY (0x24, R-only, 1/2/3 =
-     *       SINGLE/SPLIT/THREE_PHASE). Future @c begin() will read it and
-     *       override @c hint when the register is present (firmware version
-     *       >= 0x02). For v1.0 the constructor @c hint remains authoritative.
+     * @note v1.2+ firmware exposes the canonical @c REG_HW_VARIANT (0x55)
+     *       returning 0x01..0x06 (UI1/UI2/UI3/I1/I2/I3 — truth-doc §1.2).
+     *       @c begin() reads it and sets topology + voltage-hw directly,
+     *       ignoring @c hint on success. On older firmware (returns 0x00),
+     *       @c hint is the source of truth.
      */
     explicit RbAmp(TwoWire& bus,
                    uint8_t addr = 0x50,
-                   RbAmpTopology hint = RbAmpTopology::ThreePhase) noexcept;
+                   RbAmpTopology hint = RbAmpTopology::Single) noexcept;
 
     /* ============================================================
      * Lifecycle (SPEC §12)
@@ -448,6 +451,39 @@ public:
     }
 
     /**
+     * @brief Configure sensor class + per-channel CT models in one batched call (v1.3).
+     *
+     * The recommended entry point for multi-channel modules. Sets @p cls
+     * (one SAVE), then binds @c models[ch] to each channel @b ascending
+     * (order-independent on v1.3 firmware), and finishes with
+     * ONE terminal SAVE_GAINS — so a UI3 costs two flash cycles, not four.
+     *
+     * Each non-zero model is validated against the per-class accepted set (A1)
+     * before the wire write — an uncharacterised code (e.g. SCT-013-100) fails
+     * fast with @c RB_ERR_PARAM and aborts the batch. A @c models[ch] of 0
+     * leaves that channel's existing model untouched. @p n is clamped to
+     * channels().
+     *
+     * @param[in] cls    Sensor class to apply first.
+     * @param[in] models Per-channel CT codes (index 0..n-1); 0 = skip channel.
+     * @param[in] n      Number of entries in @p models.
+     * @return @c true if class + every requested bind succeeded.
+     */
+    bool configureChannels(RbAmpSensorClass cls, const uint8_t* models, uint8_t n) noexcept;
+
+    /**
+     * @brief Read the CT model actually APPLIED to a channel (mirror register).
+     *
+     * Reads REG_CT_MODEL_CH0/CH1/CH2 (0x51/0x52/0x53) — the device's read-back
+     * of the bound preset, A/B torn-read protected. Use to confirm a bind took.
+     *
+     * @param[in]  channel 0..2.
+     * @param[out] out     Applied CT code (0 = unset).
+     * @return @c true on success.
+     */
+    bool readCTModelCh(uint8_t channel, uint8_t& out) noexcept;
+
+    /**
      * @brief Bare CMD_SAVE_GAINS — flush in-memory gain registers to flash.
      *
      * Normally invoked internally by setSensorClass(), setCTModel(), and
@@ -470,46 +506,47 @@ public:
     bool saveGains() noexcept;
 
     /**
+     * @brief Persist user-config to flash — CMD_SAVE_USER_CONFIG (production-OK).
+     *
+     * Saves the user-config namespace (ct_model / sensor_class / fleet_config /
+     * group_id / label). Unlike saveGains(), this is NOT develop-gated — it
+     * works on production modules. Also clears a fresh module's first-boot
+     * FLASH_PARAMS_BAD (0xFB) error. ~700 ms (flash erase + write).
+     *
+     * @return @c true on success.
+     */
+    bool saveUserConfig() noexcept;
+
+    /**
      * @brief Arm an I2C address change (step 1 of 2).
      *
-     * Validates the new address range, verifies REG_MODE == 1 (develop),
-     * and records the arm timestamp internally. Caller must call
-     * commitAddressChange() within 5 seconds or the arm expires.
+     * Validates the new address range and records the arm timestamp. No wire
+     * I/O — the change is staged and committed by commitAddressChange(), which
+     * must be called within 5 seconds or the arm expires.
      *
-     * @warning Address change requires the module to be in develop mode
-     *          (factory-controlled — REG_MODE == 1). On a standard production
-     *          module REG_MODE is 0 and this method returns false with
-     *          RB_ERR_MODE — the device WILL NOT accept the address change.
-     *          This pair of methods is intended for factory provisioning
-     *          and integrator-side bench operations, not end-user code.
-     *          If a deployed module needs a different I²C address, the
-     *          documented path is to re-flash via the factory bench (out of
-     *          scope for the library).
+     * @note v1.3: the address change is a PRODUCTION-OK two-phase magic commit
+     *       (truth-doc §6.1) — it is NOT develop-gated. Field-swapping a
+     *       production spare to a new bus address is supported. (The legacy
+     *       develop-mode + SAVE_GAINS path has been removed.)
      *
      * @param[in] new_addr New 7-bit slave address (0x08..0x77, != current).
      * @return @c true if armed.
-     * @retval RB_ERR_PARAM via lastError(): address out of range.
-     * @retval RB_ERR_MODE  via lastError(): device not in develop mode.
+     * @retval RB_ERR_PARAM via lastError(): address out of range or == current.
      */
     bool prepareAddressChange(uint8_t new_addr) noexcept;
 
     /**
      * @brief Commit the previously prepared address change (step 2 of 2).
      *
-     * Must be called within 5 seconds of prepareAddressChange(). Writes
-     * REG_I2C_ADDRESS, issues CMD_SAVE_GAINS, waits 700 ms, issues CMD_RESET,
-     * waits 100 ms, then updates the internal address field. Subsequent
-     * operations target the new address.
+     * Must be called within 5 seconds of prepareAddressChange(). Two-phase
+     * magic commit (truth-doc §6.1): writes the candidate to REG_I2C_ADDRESS,
+     * arms 0xA5 → REG_ADDR_COMMIT_MAGIC, issues CMD_COMMIT_ADDR (persists to
+     * flash), then CMD_RESET. The internal address field is updated so
+     * subsequent calls target the new address.
      *
-     * @warning Address change requires the module to be in develop mode
-     *          (factory-controlled — REG_MODE == 1). On a standard production
-     *          module REG_MODE is 0 and this method returns false with
-     *          RB_ERR_MODE — the device WILL NOT accept the address change.
-     *          This pair of methods is intended for factory provisioning
-     *          and integrator-side bench operations, not end-user code.
-     *          If a deployed module needs a different I²C address, the
-     *          documented path is to re-flash via the factory bench (out of
-     *          scope for the library).
+     * @note Production-OK — not develop-gated (v1.3). The RESET write failing
+     *       is non-fatal: the device adopts the committed address on its next
+     *       power cycle regardless.
      *
      * @warning After a successful commit the device resets and re-enumerates
      *          at the NEW address. Subsequent calls on this RbAmp instance
@@ -574,6 +611,174 @@ public:
      *         API only — broadcastLatch is static and cannot set it directly).
      */
     static bool broadcastLatch(TwoWire& bus) noexcept;
+
+    /**
+     * @brief I2C General-Call broadcast LATCH with group filter + tick (v1.3).
+     *
+     * Transmits the 5-byte frame @c {0xA5, CMD_LATCH_PERIOD(0x27), group,
+     * tick_lo, tick_hi} to general-call address @c 0x00. Every rbAmp on the bus
+     * with @c REG_FLEET_CONFIG bit0 set (see enableGc()) AND a matching
+     * @c REG_GROUP_ID — or @c group == 0x00 (all-call) — latches its period
+     * accumulator atomically and stores @p tick in @c REG_GC_TICK (0x59).
+     *
+     * After the broadcast the master waits its settle window, then calls
+     * @c readPeriodSnapshot(snap, settle, skip_latch=true) on each device,
+     * and may verify per-module sync by reading @c readGcTick() == @p tick.
+     *
+     * Latch-only by firmware design: destructive opcodes (SAVE_*, COMMIT_ADDR,
+     * FACTORY_RESET) are never honoured over General-Call.
+     *
+     * @param[in,out] bus   Wire bus.
+     * @param[in]     group Group filter (0x00 = all-call).
+     * @param[in]     tick  16-bit window/tick counter stored in each module.
+     * @return @c true if the frame was transmitted.
+     */
+    static bool broadcastLatchGroup(TwoWire& bus, uint8_t group, uint16_t tick) noexcept;
+
+    /* ============================================================
+     * Identity / capability (v1.3)
+     * ============================================================ */
+
+    /**
+     * @brief Read the hardware SKU variant (REG_HW_VARIANT, 0x55).
+     * @return One of @c RbAmpVariant; @c Unknown on v1.0/v1.1 fw or I2C failure.
+     */
+    RbAmpVariant readVariant() noexcept;
+
+    /**
+     * @brief Read the capability bitmap (REG_CAPABILITY, 0x57, u16 LE).
+     *
+     * Branch on @c rbamp::v2::CAP_* bits, never on firmware-version heuristics.
+     *
+     * @param[out] out Capability bitmap.
+     * @return @c true on success.
+     */
+    bool readCapability(uint16_t& out) noexcept;
+
+    /**
+     * @brief Read the product family ID (REG_PRODUCT_ID, 0x54).
+     * @return 0x01 = rbAmp sensor, 0x02 = rbDimmer; 0 on failure.
+     */
+    uint8_t readProductId() noexcept;
+
+    /**
+     * @brief Read the 96-bit chip UID (REG_UID, 0x5C — 12 bytes).
+     * @param[out] out 12-byte buffer.
+     * @return @c true on success.
+     */
+    bool readUid(uint8_t out[12]) noexcept;
+
+    /* ============================================================
+     * Error / event channel (v1.3)
+     * ============================================================ */
+
+    /**
+     * @brief Read REG_ERROR (0x02) — outcome of the last write op.
+     *
+     * Name matches the cross-platform family (`rbamp_read_last_error`).
+     *
+     * @return Device error class (0x00 = OK, 0xFA..0xFF error), 0xFF on I2C fail.
+     */
+    uint8_t readLastError() noexcept;
+
+    /**
+     * @brief Read sticky event flags (REG_EVENT_FLAGS, 0x2A).
+     * @param[out] out Event bitmap (@c rbamp::v2::EVENT_* bits).
+     * @return @c true on success.
+     */
+    bool readEventFlags(uint8_t& out) noexcept;
+
+    /**
+     * @brief Clear sticky event flags by writing back a mask (write-1-to-clear).
+     * @param[in] mask Bits to clear.
+     * @return @c true on success.
+     */
+    bool clearEventFlags(uint8_t mask) noexcept;
+
+    /**
+     * @brief Durable async error check: (EVENT_FLAGS & EVENT_ERROR bit3) != 0.
+     * @param[out] out @c true if the device latched an error since last clear.
+     * @return @c true if the flags read succeeded.
+     */
+    bool hasError(bool& out) noexcept;
+
+    /**
+     * @brief Issue CMD_CLEAR_ERROR (v1.3 opcode 0x31) — clears REG_ERROR + bit3.
+     * @return @c true if the write succeeded.
+     */
+    bool clearError() noexcept;
+
+    /* ============================================================
+     * Fleet / multi-module (single-device side; see RbAmpFleet for the manager)
+     * ============================================================ */
+
+    /**
+     * @brief Enable or disable General-Call latch reception, persisted (v1.3).
+     *
+     * Read-modify-writes @c REG_FLEET_CONFIG (0x27) bit0, issues
+     * @c CMD_SAVE_USER_CONFIG (production-OK), then @c CMD_RESET — the GC ISR is
+     * wired only at boot, so a reset is mandatory for the change to take effect.
+     * Blocking (~1 s: save 700 ms + reset settle).
+     *
+     * @param[in] enable @c true to receive GC latches.
+     * @return @c true on success.
+     */
+    bool enableGc(bool enable) noexcept;
+
+    /**
+     * @brief Read REG_FLEET_CONFIG (0x27).
+     * @param[out] out Config byte (bit0 = GC_ENABLE).
+     * @return @c true on success.
+     */
+    bool readFleetConfig(uint8_t& out) noexcept;
+
+    /**
+     * @brief Set the GC group filter (REG_GROUP_ID, 0x28). Persist with
+     *        @c CMD_SAVE_USER_CONFIG (e.g. via enableGc()) to survive reset.
+     * @param[in] group Group id (0x00 = respond to all-call only).
+     * @return @c true on success.
+     */
+    bool setGroupId(uint8_t group) noexcept;
+
+    /**
+     * @brief Read the GC group filter (REG_GROUP_ID, 0x28).
+     * @param[out] out Group id.
+     * @return @c true on success.
+     */
+    bool readGroupId(uint8_t& out) noexcept;
+
+    /**
+     * @brief Read the last accepted GC tick (REG_GC_TICK, 0x59, u16 LE).
+     *
+     * A/B torn-read protected (correctness-critical fleet-sync witness).
+     * @c 0xFFFF means no GC frame has been received since boot.
+     *
+     * @param[out] out Tick value.
+     * @return @c true on success.
+     */
+    bool readGcTick(uint16_t& out) noexcept;
+
+    /**
+     * @brief Read the user location label (REG_LABEL, 0x68 — 8 ASCII bytes).
+     * @param[out] out 9-byte buffer (8 chars + NUL terminator).
+     * @return @c true on success.
+     */
+    bool readLabel(char out[9]) noexcept;
+
+    /**
+     * @brief Write the user location label (8 bytes, zero-padded past NUL).
+     *        Persist with @c CMD_SAVE_USER_CONFIG to survive reset.
+     * @param[in] label NUL-terminated string; bytes past 8 are dropped.
+     * @return @c true on success.
+     */
+    bool writeLabel(const char* label) noexcept;
+
+    /**
+     * @brief Read the live slave address (REG_I2C_ADDRESS, 0x30), A/B protected.
+     * @param[out] out 7-bit address currently held by the device.
+     * @return @c true on success.
+     */
+    bool readActiveAddress(uint8_t& out) noexcept;
 
     /* ============================================================
      * Diagnostics
@@ -657,13 +862,42 @@ private:
     bool      readU8(uint8_t reg, uint8_t& out) noexcept;
     bool      readU16LE(uint8_t reg, uint16_t& out) noexcept;
     bool      readU32LE(uint8_t reg, uint32_t& out) noexcept;
-    bool      readFloatLE(uint8_t reg, float& out) noexcept;
+    /* readFloatLE accepts an optional per-quantity magnitude ceiling. Defaults
+     * to 30000.0 (the max of any physical quantity in the rbAmp public API:
+     * P/Q ≤ 30 kW; U ≤ 500 V; I ≤ 150 A; PF ≤ 1.5). Per-quantity helpers below
+     * pass tight values so a 11 kW load doesn't trip the global filter (was
+     * 10000 — truth-doc §16.2 #2 cross-lib parity fix). */
+    bool      readFloatLE(uint8_t reg, float& out,
+                          float max_abs = 30000.0f) noexcept;
     bool      registerAcks(uint8_t reg) noexcept;   /**< Used by variant detect. */
+
+    /* A/B torn-read defense for correctness-critical decided values (address,
+     * GC_TICK, CT-model mirror). On a shared open-drain bus a torn read can
+     * return a corrupt mix; read twice, and on disagreement read a third time
+     * and take the 2-of-3 majority. All-three-disagree → sanity_reject_count_++
+     * and false. Single-byte NACK-retry runs underneath each sub-read. */
+    bool      readU8AB(uint8_t reg, uint8_t& out) noexcept;
+    bool      readU16AB(uint8_t reg, uint16_t& out) noexcept;
+
+    /* Per-class CT-model accepted-set validation (A1). NON-contiguous, per the
+     * esp-idf reference _ct_model_valid: SCT013 {1,2,3,4,6}, WIRED_CT {1,2,3},
+     * BUILTIN_CT {} (codes 5/7 uncharacterised → reject). Firmware is the
+     * ultimate authority; this is a client-side fast-fail only. */
+    static bool ctModelValid(RbAmpSensorClass cls, uint8_t code) noexcept;
+
+    /* Post-bind mirror verify (configureChannels). Returns RB_OK if the applied
+     * mirror matches; RB_ERR_PARAM if stable-wrong (caller re-binds once);
+     * RB_ERR_NON_PHYSICAL if the mirror read stayed torn (trust the accepted CMD). */
+    int8_t    verifyCtBind(uint8_t channel, uint8_t expected) noexcept;
 
     /* --- Helpers --- */
     void      detectVariant() noexcept;             /**< Called by begin(). */
     void      setError(int8_t err) noexcept;        /**< Updates last_error_ + optional log. */
-    float     readRtFloat(uint8_t reg, uint8_t ch, uint8_t stride = 4) noexcept;
+    float     readRtFloat(uint8_t reg, uint8_t ch, uint8_t stride = 4,
+                          float max_abs = 30000.0f) noexcept;
+    /* readAll folding: on a sanity-reject (RB_ERR_NON_PHYSICAL) set field=NaN +
+     * flag the implausible bit and keep going; on transport failure return false. */
+    bool      foldField(bool read_ok, float& field, uint8_t& mask, uint8_t bit) noexcept;
     static uint8_t addressForCurrentReg(uint8_t base, uint8_t ch) noexcept {
         return static_cast<uint8_t>(base + ch * 4);
     }
@@ -674,12 +908,30 @@ private:
     RbAmpTopology  topology_;
     uint8_t        channels_;
     bool           has_voltage_hw_;
+    RbAmpVariant   variant_;       /**< Cached REG_HW_VARIANT (0x55), set in begin(). */
+    uint16_t       capability_;    /**< Cached REG_CAPABILITY (0x57), set in begin(). */
     int8_t         last_error_;
     Stream*        log_;
 
-    /* Period-metering state — master-tracked wall-clock for energy integration */
-    uint32_t       last_latch_ms_;
-    bool           have_last_latch_;
+    /* Period-metering state — master-tracked wall-clock for energy integration.
+     *
+     * Multi-module pattern requires two timestamps (per truth-doc §16.2 #1):
+     *   - prev_latch_ms_     = wall-clock of the last CONSUMED (valid) latch;
+     *                          rolled forward ONLY on a valid snapshot, HELD on
+     *                          STALE (chip preserves its accumulator — OI-3)
+     *   - current_latch_ms_  = wall-clock at the most recent latch issue,
+     *                          stamped inside latchPeriod() AND inside
+     *                          readPeriodSnapshot() (the non-skip path).
+     *
+     * dt for energy integration = current - prev. Single-timestamp tracking
+     * would collapse to (settle_ms) in the canonical multi-module sequence:
+     *   for m: latchPeriod(m)   // each stamps own current+prev (BAD: single var)
+     *   sleep(50)
+     *   for m: readPeriodSnapshot(m, skip_latch=true)  // reports dt≈50 ms.
+     */
+    uint32_t       prev_latch_ms_;
+    uint32_t       current_latch_ms_;
+    bool           have_prev_latch_;
 
     /* Address-change two-step state */
     uint8_t        pending_addr_;

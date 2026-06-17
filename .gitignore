@@ -1,31 +1,8 @@
-# IDE / editors / Claude
-.vscode/
-.idea/
-.claude/
-.mcp.json
-*.swp
-.DS_Store
-Thumbs.db
-
-# Arduino / PlatformIO build artefacts
+extras/
 build/
-.pio/
-.pioenvs/
-.piolibdeps/
-*.elf
-*.bin
-*.hex
 *.o
-*.obj
-*.map
-*.cache
-
-# Internal tests / bench / canaries
-extras/tests/
-*.local.json
-arduino-cli.yaml
-
-# Misc
-*.bak
-*.orig
-*.tmp
+*.elf
+*.log
+.vscode/
+.cache/
+.DS_Store

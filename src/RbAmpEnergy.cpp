@@ -9,7 +9,7 @@
 #include "RbAmpEnergy.h"
 
 RbAmpEnergy::RbAmpEnergy() noexcept
-    : wh_{0.0, 0.0, 0.0}, enabled_(true) {}
+    : wh_{0.0, 0.0, 0.0}, enabled_(true), dropped_dt_count_(0) {}
 
 void RbAmpEnergy::tick(const RbAmpPeriodSnapshot& snap, uint8_t channels) noexcept {
     if (!enabled_ || !snap.valid) {
@@ -25,9 +25,10 @@ void RbAmpEnergy::tick(const RbAmpPeriodSnapshot& snap, uint8_t channels) noexce
      * paused (deep sleep, WiFi reconnect storm, debugger break) or the
      * millis() counter wrapped between two snapshots. Integrating avg_p over
      * that gap would silently inject a spurious multi-hour Wh delta. Drop the
-     * sample and require the caller to manually fold in expected energy via
-     * external accounting if needed. */
+     * sample and bump the diagnostic counter so the caller can detect "lost"
+     * Wh via droppedDtCount() (truth-doc §16.2 #5 cross-lib parity). */
     if (dt_s > 3600.0) {
+        dropped_dt_count_++;
         return;
     }
     const uint8_t n = (channels > 3) ? 3 : channels;

@@ -21,7 +21,7 @@
  *    re-latching after the shared LATCH burst.
  *
  * Each module must have a UNIQUE I2C address (set with prepareAddressChange /
- * commitAddressChange while the device is in develop mode — see example 5).
+ * commitAddressChange — see example 5 — or the RbAmpFleet provisioning helpers).
  *
  * Example output:
  *   sync_us=312  mod0 ok dt=60012 P0=  234W  Wh0=12.345
