@@ -23,7 +23,7 @@ static constexpr uint8_t REG_STATUS                     = 0x00; // bit0=READY, b
 static constexpr uint8_t REG_COMMAND                    = 0x01; // Write CMD_* opcode (see commands.yaml)
 static constexpr uint8_t REG_ERROR                      = 0x02; // 0x00=OK; 0xFA..0xFF error classes (see errors.yaml)
 static constexpr uint8_t REG_VERSION                    = 0x03; // Firmware version: 0x01 = v1.0
-static constexpr uint8_t REG_MODE                       = 0x04; // 0=production, 1=develop (mirrors g_mode_develop pin)
+static constexpr uint8_t REG_MODE                       = 0x04; // Device mode byte (read-only, factory use)
 static constexpr uint8_t REG_CT_MODEL                   = 0x05; // SCT-013 SKU 0=unset/1=-005/2=-010/3=-030/4=-050/5=-100. Save via CMD_SAVE_GAINS.
 static constexpr uint8_t REG_V03_PHASE_SAMPLES          = 0x06; // ADC sample advance of U vs I for cross-product. Range 0..30. Save via CMD_SAVE_GAINS.
 static constexpr uint8_t REG_V03_PERIOD_VALID           = 0x07; // After CMD_LATCH_PERIOD: bit0=1 if snapshot fresh, 0 if race. Master MUST check before reading period block.
@@ -47,7 +47,7 @@ static constexpr uint8_t REG_SENSOR_CLASS               = 0x25; // v1.2+: 0=UNSE
 static constexpr uint8_t REG_V03_PHASE_FRACT            = 0x26; // v1.2+: Q8 fractional sample shift (0..255 = 0..0.996 sample) combined with V03_PHASE_SAMPLES for sub-sample phase comp. Save via CMD_SAVE_GAINS. Calibrated on inductive bench fixture only.
 static constexpr uint8_t REG_FLEET_CONFIG               = 0x27; // bit0=GC_ENABLE (General-Call broadcast latch reception). Persist via CMD_SAVE_USER_CONFIG; effective after reset.
 static constexpr uint8_t REG_GROUP_ID                   = 0x28; // GC latch group filter. GC frame group byte 0x00=all-call; else must match this. Persist via CMD_SAVE_USER_CONFIG.
-static constexpr uint8_t REG_I2C_ADDRESS                = 0x30; // Slave address (0x08..0x77). Change via two-phase commit: write candidate here (RAM) -> arm 0xA5 to ADDR_COMMIT_MAGIC -> CMD_COMMIT_ADDR -> CMD_RESET. Production-OK (not develop-gated).
+static constexpr uint8_t REG_I2C_ADDRESS                = 0x30; // Slave address (0x08..0x77). Change via two-phase commit: write candidate here (RAM) -> arm 0xA5 to ADDR_COMMIT_MAGIC -> CMD_COMMIT_ADDR -> CMD_RESET. Production-OK (not factory-gated).
 static constexpr uint8_t REG_ADDR_COMMIT_MAGIC          = 0x31; // Write 0xA5 to arm CMD_COMMIT_ADDR; consumed on commit; reads 0x00.
 static constexpr uint8_t REG_TEMP_T_WARN                = 0x36; // Warning threshold
 static constexpr uint8_t REG_TEMP_T_DERATE              = 0x37; // Derate threshold

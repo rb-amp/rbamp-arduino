@@ -752,7 +752,7 @@ bool RbAmp::prepareAddressChange(uint8_t new_addr) noexcept {
         return false;
     }
     /* v1.3: address change is PRODUCTION-OK via the two-phase magic commit
-     * (truth-doc §6.1) — NOT develop-gated. No wire I/O here; just arm and
+     * (truth-doc §6.1) — NOT factory-gated. No wire I/O here; just arm and
      * record the timestamp (5 s window enforced in commitAddressChange). */
     pending_addr_ = new_addr;
     pending_addr_armed_ms_ = millis();
@@ -1101,7 +1101,7 @@ const char* RbAmp::errorString(int8_t code) noexcept {
         case RB_ERR_NOT_READY:      return "Device not ready";
         case RB_ERR_STALE:          return "Period snapshot stale";
         case RB_ERR_PARAM:          return "Bad parameter";
-        case RB_ERR_MODE:           return "Operation requires develop mode";
+        case RB_ERR_MODE:           return "Operation requires factory mode";
         case RB_ERR_CHECKSUM:       return "Codegen parity mismatch";
         case RB_ERR_VERSION:        return "Unsupported firmware version";
         case RB_ERR_NOT_IMPLEMENTED: return "Not implemented (RESERVED FOR v2)";

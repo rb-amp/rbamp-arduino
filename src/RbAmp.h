@@ -509,7 +509,7 @@ public:
      * @brief Persist user-config to flash — CMD_SAVE_USER_CONFIG (production-OK).
      *
      * Saves the user-config namespace (ct_model / sensor_class / fleet_config /
-     * group_id / label). Unlike saveGains(), this is NOT develop-gated — it
+     * group_id / label). Unlike saveGains(), this is NOT factory-gated — it
      * works on production modules. Also clears a fresh module's first-boot
      * FLASH_PARAMS_BAD (0xFB) error. ~700 ms (flash erase + write).
      *
@@ -525,9 +525,9 @@ public:
      * must be called within 5 seconds or the arm expires.
      *
      * @note v1.3: the address change is a PRODUCTION-OK two-phase magic commit
-     *       (truth-doc §6.1) — it is NOT develop-gated. Field-swapping a
+     *       (truth-doc §6.1) — it is NOT factory-gated. Field-swapping a
      *       production spare to a new bus address is supported. (The legacy
-     *       develop-mode + SAVE_GAINS path has been removed.)
+     *       factory-mode + SAVE_GAINS path has been removed.)
      *
      * @param[in] new_addr New 7-bit slave address (0x08..0x77, != current).
      * @return @c true if armed.
@@ -544,7 +544,7 @@ public:
      * flash), then CMD_RESET. The internal address field is updated so
      * subsequent calls target the new address.
      *
-     * @note Production-OK — not develop-gated (v1.3). The RESET write failing
+     * @note Production-OK — not factory-gated (v1.3). The RESET write failing
      *       is non-fatal: the device adopts the committed address on its next
      *       power cycle regardless.
      *

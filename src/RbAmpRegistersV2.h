@@ -26,9 +26,9 @@ static constexpr uint8_t REG_STATUS = 0x00;  // bit0=READY, bit1=ERROR, bit2=EVE
 static constexpr uint8_t REG_COMMAND = 0x01;  // Write CMD_* opcode (commands.yaml)
 static constexpr uint8_t REG_ERROR = 0x02;  // 0x00=OK; 0xFA..0xFF error classes; ERR_CLONE added v1.3. Clear via CMD_CLEAR_ERROR (v1.3)
 static constexpr uint8_t REG_VERSION = 0x03;  // 0x01=v1.0 .. 0x04=v1.3
-static constexpr uint8_t REG_MODE = 0x04;  // 0=production, 1=develop (PB5 strap at boot)
+static constexpr uint8_t REG_MODE = 0x04;  // Device mode byte (read-only, factory use)
 static constexpr uint8_t REG_CT_MODEL = 0x05;  // SCT-013 SKU 0=unset/1=-005/2=-010/3=-030/4=-050/5=-100/6=-020/7=-060 (v1.3). Direct write applies preset to ch
-static constexpr uint8_t REG_V03_PHASE_SAMPLES = 0x06;  // U-vs-I sample advance, 0..30. Develop-gated write (v1.3). Save via CMD_SAVE_GAINS.
+static constexpr uint8_t REG_V03_PHASE_SAMPLES = 0x06;  // U-vs-I sample advance, 0..30. Factory-gated write (v1.3). Save via CMD_SAVE_GAINS.
 static constexpr uint8_t REG_V03_PERIOD_VALID = 0x07;  // Set by CMD_LATCH_PERIOD: 1=fresh snapshot, 0=empty accumulator (race). NOT cleared-on-read. Failed latch does 
 static constexpr uint8_t REG_LUT_VALID_MASK = 0x08;  // bit n = slot n has valid LUT
 static constexpr uint8_t REG_LUT_QUERY_SLOT = 0x09;  // Select slot 0..3 → metadata latched into 0x0A-0x0F
@@ -56,7 +56,7 @@ static constexpr uint8_t REG_AC_PERIOD_SIZE = 2;
 static constexpr uint8_t REG_CALIBRATION = 0x23;  // Legacy calibration status byte
 static constexpr uint8_t REG_TOPOLOGY = 0x24;  // 1=SINGLE, 2=SPLIT_PHASE, 3=THREE_PHASE (=V03_N_I)
 static constexpr uint8_t REG_SENSOR_CLASS = 0x25;  // 0=UNSET, 1=SCT_013, 2=WIRED_CT, 3=BUILTIN_CT. Class change resets CT_MODEL=0.
-static constexpr uint8_t REG_V03_PHASE_FRACT = 0x26;  // Sub-sample phase shift Q8. Develop-gated write (v1.3). Save via CMD_SAVE_GAINS.
+static constexpr uint8_t REG_V03_PHASE_FRACT = 0x26;  // Sub-sample phase shift Q8. Factory-gated write (v1.3). Save via CMD_SAVE_GAINS.
 static constexpr uint8_t REG_FLEET_CONFIG = 0x27;  // bit0=GC_ENABLE (General-Call latch reception; effective after reset - ENGC not toggled live). bits1-7 reserved
 static constexpr uint8_t REG_GROUP_ID = 0x28;  // GC latch group filter. 0 = respond to all-call only. GC frame group byte must match or be 0x00
 static constexpr uint8_t REG_DIGEST_CONFIG = 0x29;  // Digest window composition bitmask (see digest_mask_bits). Bits unsupported by variant → ERR_PARAM. 0 = digest 
@@ -140,23 +140,23 @@ static constexpr uint8_t REG_V03_PERIOD_AVG_P = 0xDC;  // PRODUCTION energy prim
 static constexpr uint8_t REG_V03_PERIOD_AVG_P_SIZE = 4;
 static constexpr uint8_t REG_V03_PERIOD_MAX_P = 0xE0;  // Latched max P ch0 this period
 static constexpr uint8_t REG_V03_PERIOD_MAX_P_SIZE = 4;
-static constexpr uint8_t REG_V03_U_NOISE_FLOOR = 0xE4;  // Develop-gated write (v1.3)
+static constexpr uint8_t REG_V03_U_NOISE_FLOOR = 0xE4;  // Factory-gated write (v1.3)
 static constexpr uint8_t REG_V03_U_NOISE_FLOOR_SIZE = 2;
-static constexpr uint8_t REG_V03_I0_NOISE_FLOOR = 0xE6;  // Develop-gated write (v1.3)
+static constexpr uint8_t REG_V03_I0_NOISE_FLOOR = 0xE6;  // Factory-gated write (v1.3)
 static constexpr uint8_t REG_V03_I0_NOISE_FLOOR_SIZE = 2;
-static constexpr uint8_t REG_V03_I1_NOISE_FLOOR = 0xE8;  // Develop-gated write (v1.3)
+static constexpr uint8_t REG_V03_I1_NOISE_FLOOR = 0xE8;  // Factory-gated write (v1.3)
 static constexpr uint8_t REG_V03_I1_NOISE_FLOOR_SIZE = 2;
-static constexpr uint8_t REG_V03_I2_NOISE_FLOOR = 0xEA;  // Develop-gated write (v1.3)
+static constexpr uint8_t REG_V03_I2_NOISE_FLOOR = 0xEA;  // Factory-gated write (v1.3)
 static constexpr uint8_t REG_V03_I2_NOISE_FLOOR_SIZE = 2;
 static constexpr uint8_t REG_V03_PERIOD_LATCH_MS = 0xEC;  // Chip-side dt between last two latches. Master fallback after its own restart
 static constexpr uint8_t REG_V03_PERIOD_LATCH_MS_SIZE = 4;
-static constexpr uint8_t REG_V03_U_GAIN = 0xF0;  // Develop-gated write (v1.3). Save via CMD_SAVE_GAINS
+static constexpr uint8_t REG_V03_U_GAIN = 0xF0;  // Factory-gated write (v1.3). Save via CMD_SAVE_GAINS
 static constexpr uint8_t REG_V03_U_GAIN_SIZE = 4;
-static constexpr uint8_t REG_V03_I0_GAIN = 0xF4;  // Develop-gated write (v1.3)
+static constexpr uint8_t REG_V03_I0_GAIN = 0xF4;  // Factory-gated write (v1.3)
 static constexpr uint8_t REG_V03_I0_GAIN_SIZE = 4;
-static constexpr uint8_t REG_V03_I1_GAIN = 0xF8;  // Develop-gated write (v1.3)
+static constexpr uint8_t REG_V03_I1_GAIN = 0xF8;  // Factory-gated write (v1.3)
 static constexpr uint8_t REG_V03_I1_GAIN_SIZE = 4;
-static constexpr uint8_t REG_V03_I2_GAIN = 0xFC;  // Develop-gated write (v1.3)
+static constexpr uint8_t REG_V03_I2_GAIN = 0xFC;  // Factory-gated write (v1.3)
 static constexpr uint8_t REG_V03_I2_GAIN_SIZE = 4;
 
 // ---- Command opcodes ----
