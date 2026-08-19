@@ -186,16 +186,42 @@ void RbAmp::detectVariant() noexcept {
         capability_ = cap;
     }
 
-    if (variant_ok && variant >= 0x01 && variant <= 0x06) {
-        /* v1.2+ path — variant byte is authoritative. */
+    if (variant_ok && variant >= 0x01 && variant <= 0x08) {
+        /* v1.2+ path — variant byte gives SKU + voltage presence; the I-channel
+         * COUNT is authoritative in REG_TOPOLOGY (0x24). BUILD_VARIANT codes
+         * (truth-doc §1.2): 1=UI1 2=UI2 3=UI3 4=I1 5=I2 6=I3 7=UI5 8=UI7.
+         * Voltage hardware present for {1,2,3,7,8}, absent for {4,5,6}. */
         variant_ = static_cast<RbAmpVariant>(variant);
+        has_voltage_hw_ = (variant == 1 || variant == 2 || variant == 3 ||
+                           variant == 7 || variant == 8);
+
+        uint8_t ch_from_variant;
         switch (variant) {
-            case 0x01: topology_ = RbAmpTopology::Single;     channels_ = 1; has_voltage_hw_ = true;  break;
-            case 0x02: topology_ = RbAmpTopology::SplitPhase; channels_ = 2; has_voltage_hw_ = true;  break;
-            case 0x03: topology_ = RbAmpTopology::ThreePhase; channels_ = 3; has_voltage_hw_ = true;  break;
-            case 0x04: topology_ = RbAmpTopology::Single;     channels_ = 1; has_voltage_hw_ = false; break;
-            case 0x05: topology_ = RbAmpTopology::SplitPhase; channels_ = 2; has_voltage_hw_ = false; break;
-            case 0x06: topology_ = RbAmpTopology::ThreePhase; channels_ = 3; has_voltage_hw_ = false; break;
+            case 0x01: case 0x04: ch_from_variant = 1; break;
+            case 0x02: case 0x05: ch_from_variant = 2; break;
+            case 0x03: case 0x06: ch_from_variant = 3; break;
+            case 0x07:            ch_from_variant = 5; break;
+            case 0x08:            ch_from_variant = 7; break;
+            default:              ch_from_variant = 1; break;
+        }
+
+        /* REG_TOPOLOGY (0x24) = I-channel count {1,2,3,5,7}, authoritative when
+         * readable; fall back to the variant-derived count otherwise. */
+        uint8_t topo = 0;
+        if (readU8(v2::REG_TOPOLOGY, topo) &&
+            (topo == 1 || topo == 2 || topo == 3 || topo == 5 || topo == 7)) {
+            channels_ = topo;
+        } else {
+            channels_ = ch_from_variant;
+        }
+
+        switch (channels_) {
+            case 1: topology_ = RbAmpTopology::Single;     break;
+            case 2: topology_ = RbAmpTopology::SplitPhase; break;
+            case 3: topology_ = RbAmpTopology::ThreePhase; break;
+            case 5: topology_ = RbAmpTopology::Five;       break;
+            case 7: topology_ = RbAmpTopology::Seven;      break;
+            default: topology_ = RbAmpTopology::Single;    break;
         }
         if (log_) {
             log_->print(F("[rbamp] variant=0x"));
@@ -241,6 +267,40 @@ float RbAmp::readRtFloat(uint8_t base, uint8_t ch, uint8_t stride, float max_abs
     return v;
 }
 
+float RbAmp::readChannelWindow(uint8_t ch, uint8_t field, float max_abs) noexcept {
+    if (ch >= channels_) {
+        setError(RB_ERR_PARAM);
+        return NAN;
+    }
+    /* Rule #1: re-select before EVERY read — the data buffer at 0x3C..0x3F is a
+     * snapshot of the value at select time; a read without a fresh select
+     * returns the previous snapshot. The selector is a single DUT-wide resource,
+     * so select+read is one atomic section per call. */
+    const uint8_t sel = static_cast<uint8_t>((field << 4) | (ch & 0x0F));
+    if (!writeReg(v2::REG_CHANNEL_SELECT, sel)) {
+        setError(RB_ERR_IO);
+        return NAN;
+    }
+    float v = NAN;
+    if (!readFloatLE(v2::REG_CHANNEL_DATA, v, max_abs)) {
+        setError(RB_ERR_IO);
+        return NAN;
+    }
+    setError(RB_OK);
+    return v;
+}
+
+bool RbAmp::foldChannelWindow(uint8_t ch, uint8_t field, float& out_field,
+                              uint8_t& mask, uint8_t bit, float max_abs) noexcept {
+    /* Re-select (rule #1), then fold the data read exactly like the flat path. */
+    const uint8_t sel = static_cast<uint8_t>((field << 4) | (ch & 0x0F));
+    if (!writeReg(v2::REG_CHANNEL_SELECT, sel)) {
+        return false;   /* transport — caller aborts */
+    }
+    return foldField(readFloatLE(v2::REG_CHANNEL_DATA, out_field, max_abs),
+                     out_field, mask, bit);
+}
+
 float RbAmp::readVoltage(uint8_t phase) noexcept {
     if (phase != 0) {
         setError(RB_ERR_PARAM);
@@ -270,18 +330,23 @@ float RbAmp::readVoltagePeak(uint8_t phase) noexcept {
 }
 
 float RbAmp::readCurrent(uint8_t ch) noexcept {
+    /* ch0-2 = flat block; ch3+ = channel access window (senior SKUs). */
+    if (ch >= 3) return readChannelWindow(ch, v2::CHFIELD_I_RMS, 150.0f);
     return readRtFloat(REG_V03_I0_RMS, ch, 4, 150.0f);
 }
 
 float RbAmp::readCurrentPeak(uint8_t ch) noexcept {
+    if (ch >= 3) return readChannelWindow(ch, v2::CHFIELD_I_PEAK, 250.0f);
     return readRtFloat(REG_V03_I0_PEAK, ch, 4, 250.0f);
 }
 
 float RbAmp::readPower(uint8_t ch) noexcept {
+    if (ch >= 3) return readChannelWindow(ch, v2::CHFIELD_P_REAL, 30000.0f);
     return readRtFloat(REG_V03_P0_REAL, ch, 4, 30000.0f);
 }
 
 float RbAmp::readPowerFactor(uint8_t ch) noexcept {
+    if (ch >= 3) return readChannelWindow(ch, v2::CHFIELD_PF, 1.5f);
     return readRtFloat(REG_V03_PF0, ch, 4, 1.5f);
 }
 
@@ -319,8 +384,14 @@ bool RbAmp::readAll(RbAmpSnapshot& out) noexcept {
     if (!foldField(readFloatLE(REG_V03_U_PEAK, out.voltage_peak, 800.0f),
                    out.voltage_peak, out.implausible, RBAMP_FIELD_VOLTAGE)) { setError(RB_ERR_IO); return false; }
 
-    for (uint8_t ch = 0; ch < 3; ++ch) {
-        if (ch < channels_) {
+    for (uint8_t ch = 0; ch < RBAMP_MAX_CHANNELS; ++ch) {
+        if (ch >= channels_) {
+            out.current[ch] = out.current_peak[ch] = 0.0f;
+            out.power[ch] = out.power_factor[ch] = 0.0f;
+            continue;
+        }
+        if (ch < 3) {
+            /* Flat block ch0-2 — one contiguous set of reads. */
             const uint8_t off = static_cast<uint8_t>(ch * 4);
             if (!foldField(readFloatLE(static_cast<uint8_t>(REG_V03_I0_RMS + off), out.current[ch], 150.0f),
                            out.current[ch], out.implausible, RBAMP_FIELD_CURRENT)) { setError(RB_ERR_IO); return false; }
@@ -331,8 +402,11 @@ bool RbAmp::readAll(RbAmpSnapshot& out) noexcept {
             if (!foldField(readFloatLE(static_cast<uint8_t>(REG_V03_PF0 + off), out.power_factor[ch], 1.5f),
                            out.power_factor[ch], out.implausible, RBAMP_FIELD_PF)) { setError(RB_ERR_IO); return false; }
         } else {
-            out.current[ch] = out.current_peak[ch] = 0.0f;
-            out.power[ch] = out.power_factor[ch] = 0.0f;
+            /* ch3+ (senior SKUs) — channel access window, re-select per field. */
+            if (!foldChannelWindow(ch, v2::CHFIELD_I_RMS,  out.current[ch],      out.implausible, RBAMP_FIELD_CURRENT, 150.0f))   { setError(RB_ERR_IO); return false; }
+            if (!foldChannelWindow(ch, v2::CHFIELD_I_PEAK, out.current_peak[ch], out.implausible, RBAMP_FIELD_CURRENT, 250.0f))   { setError(RB_ERR_IO); return false; }
+            if (!foldChannelWindow(ch, v2::CHFIELD_P_REAL, out.power[ch],        out.implausible, RBAMP_FIELD_POWER,   30000.0f)) { setError(RB_ERR_IO); return false; }
+            if (!foldChannelWindow(ch, v2::CHFIELD_PF,     out.power_factor[ch], out.implausible, RBAMP_FIELD_PF,      1.5f))     { setError(RB_ERR_IO); return false; }
         }
     }
 
@@ -378,6 +452,12 @@ float RbAmp::readPeriodAvgPower(uint8_t ch) noexcept {
     if (ch >= channels_) {
         setError(RB_ERR_PARAM);
         return NAN;
+    }
+    /* ch3+ (senior SKUs): the latched period average is exposed via the channel
+     * window field 13 (PERIOD_AVG_P), latched atomically with the flat ch0-2
+     * trio by CMD_LATCH_PERIOD. */
+    if (ch >= 3) {
+        return readChannelWindow(ch, v2::CHFIELD_PERIOD_AVG_P, 30000.0f);
     }
     /* Per SPEC: ch0 at 0xDC, ch1 at 0xC2, ch2 at 0xC6 — non-contiguous! */
     uint8_t reg;
@@ -425,7 +505,7 @@ bool RbAmp::readPeriodSnapshot(RbAmpPeriodSnapshot& out,
     out.max_p = 0.0f;
     out.latch_ms = 0;
     out.master_dt_ms = 0;
-    for (uint8_t i = 0; i < 3; ++i) {
+    for (uint8_t i = 0; i < RBAMP_MAX_CHANNELS; ++i) {
         out.avg_p[i] = 0.0f;
     }
 
@@ -1092,6 +1172,17 @@ bool RbAmp::broadcastLatchGroup(TwoWire& bus, uint8_t group, uint16_t tick) noex
  * Diagnostics
  * ============================================================================ */
 
+bool RbAmp::readCommitSeq(uint8_t& out) noexcept {
+    /* Digest SEQ byte at REG_DIGEST+1 (0x71): increments once per RT commit
+     * (~20 ms), wraps 255->0. Change detection only — there is no CRC. */
+    if (!readU8(static_cast<uint8_t>(v2::REG_DIGEST + 1), out)) {
+        setError(RB_ERR_IO);
+        return false;
+    }
+    setError(RB_OK);
+    return true;
+}
+
 const char* RbAmp::errorString(int8_t code) noexcept {
     switch (code) {
         case RB_OK:                 return "OK";
@@ -1104,7 +1195,7 @@ const char* RbAmp::errorString(int8_t code) noexcept {
         case RB_ERR_MODE:           return "Operation requires factory mode";
         case RB_ERR_CHECKSUM:       return "Codegen parity mismatch";
         case RB_ERR_VERSION:        return "Unsupported firmware version";
-        case RB_ERR_NOT_IMPLEMENTED: return "Not implemented (RESERVED FOR v2)";
+        case RB_ERR_NOT_IMPLEMENTED: return "Not implemented on this firmware";
         case RB_ERR_NON_PHYSICAL:    return "Non-physical value (NaN/Inf/out-of-bounds)";
         default:                return "Unknown error";
     }

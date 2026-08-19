@@ -128,7 +128,7 @@ public:
     void resetDroppedDtCount() noexcept { dropped_dt_count_ = 0; }
 
 private:
-    double   wh_[3];              /**< Per-channel Wh accumulator. */
+    double   wh_[RBAMP_MAX_CHANNELS]; /**< Per-channel Wh accumulator. */
     bool     enabled_;            /**< Master switch for tick(). */
     uint32_t dropped_dt_count_;   /**< Diagnostic: tick() calls clamped on dt > 1 h. */
 };

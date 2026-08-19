@@ -593,22 +593,22 @@ public:
      * ============================================================ */
 
     /**
-     * @brief I2C General-Call broadcast LATCH — RESERVED for v2 firmware.
+     * @brief I2C General-Call broadcast LATCH — all-call convenience (v1.3).
      *
-     * @warning v1 rbAmp firmware DISABLES General-Call (SPEC §9), so this
-     *          method returns @c false WITHOUT touching the bus. Callers
-     *          must fall back to per-device sequential @c latchPeriod()
-     *          (see example 03_MultiModuleBroadcast for the recommended
-     *          skew-tolerant pattern).
+     * Delegates to @c broadcastLatchGroup(bus, 0x00, 0x0000): broadcasts the
+     * latch frame to every GC-enabled module on the bus (@c REG_FLEET_CONFIG
+     * bit0, opt-in per device via @c enableGc()). Group @c 0x00 = all-call, so
+     * every enabled module latches regardless of @c REG_GROUP_ID.
      *
-     * Intended behaviour (v2): writes @c [REG_COMMAND=0x01, CMD_LATCH_PERIOD=0x27]
-     * to general-call address 0x00, latching every rbAmp on the bus within
-     * microseconds. Master then times wall-clock dt and calls
-     * @c readPeriodSnapshot(snap, settle_ms, true) on each device.
+     * After the broadcast the master waits its settle window, then calls
+     * @c readPeriodSnapshot(snap, settle, skip_latch=true) on each device.
      *
-     * @param[in,out] bus Wire bus (unused in v1 — accepted for API parity).
-     * @return Always @c false on v1 firmware; check @c lastError() (per-instance
-     *         API only — broadcastLatch is static and cannot set it directly).
+     * On v1.0/v1.1 firmware General-Call is disabled, so the frame is harmlessly
+     * ignored — fall back to per-device sequential @c latchPeriod() there (see
+     * example 03_MultiModuleBroadcast for the skew-tolerant pattern).
+     *
+     * @param[in,out] bus Wire bus.
+     * @return @c true if the frame was transmitted.
      */
     static bool broadcastLatch(TwoWire& bus) noexcept;
 
@@ -785,6 +785,20 @@ public:
      * ============================================================ */
 
     /**
+     * @brief Read the digest commit sequence byte (REG_DIGEST+1, 0x71).
+     *
+     * The device increments this once per RT commit (~20 ms), wrapping
+     * 255→0. Sample it before and after a multi-register read to detect that
+     * the underlying accumulator advanced mid-read (values may straddle two
+     * commits). There is NO CRC in the digest — this is a change flag only,
+     * paired with the per-value @c isfinite()/range filter for integrity.
+     *
+     * @param[out] out Sequence byte (0..255).
+     * @return @c true on success.
+     */
+    bool readCommitSeq(uint8_t& out) noexcept;
+
+    /**
      * @brief Last error code from any operation.
      * @return One of @c rbamp::RB_OK or @c rbamp::RB_ERR_* (see RbAmpRegisters.h).
      */
@@ -895,9 +909,19 @@ private:
     void      setError(int8_t err) noexcept;        /**< Updates last_error_ + optional log. */
     float     readRtFloat(uint8_t reg, uint8_t ch, uint8_t stride = 4,
                           float max_abs = 30000.0f) noexcept;
+    /* Channel access window (senior SKUs, ch>=3): re-select 0x32=(field<<4)|ch
+     * then read the 0x3C..0x3F float32 snapshot. Re-selects on EVERY call
+     * (contract rule #1 — the data buffer is the value at select time). */
+    float     readChannelWindow(uint8_t ch, uint8_t field, float max_abs) noexcept;
     /* readAll folding: on a sanity-reject (RB_ERR_NON_PHYSICAL) set field=NaN +
      * flag the implausible bit and keep going; on transport failure return false. */
     bool      foldField(bool read_ok, float& field, uint8_t& mask, uint8_t bit) noexcept;
+    /* readAll helper for ch>=3: select the window field, read it, and fold with
+     * the same implausible-vs-transport semantics as foldField. Returns false
+     * only on a transport failure (caller aborts); a sanity-reject folds to
+     * NaN+flag and returns true. */
+    bool      foldChannelWindow(uint8_t ch, uint8_t field, float& out_field,
+                                uint8_t& mask, uint8_t bit, float max_abs) noexcept;
     static uint8_t addressForCurrentReg(uint8_t base, uint8_t ch) noexcept {
         return static_cast<uint8_t>(base + ch * 4);
     }

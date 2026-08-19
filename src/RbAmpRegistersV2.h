@@ -18,7 +18,7 @@
 namespace rbamp {
 namespace v2 {
 
-static constexpr uint32_t REG_SCHEMA_CRC32_V2 = 0x5FB3E9F3U;
+static constexpr uint32_t REG_SCHEMA_CRC32_V2 = 0x131F3839U;
 static constexpr uint16_t PROTOCOL_VERSION_V2 = 0x0103U;  // 1.3 — (major<<8)|minor
 
 // ---- Register addresses + sizes ----
@@ -27,7 +27,7 @@ static constexpr uint8_t REG_COMMAND = 0x01;  // Write CMD_* opcode (commands.ya
 static constexpr uint8_t REG_ERROR = 0x02;  // 0x00=OK; 0xFA..0xFF error classes; ERR_CLONE added v1.3. Clear via CMD_CLEAR_ERROR (v1.3)
 static constexpr uint8_t REG_VERSION = 0x03;  // 0x01=v1.0 .. 0x04=v1.3
 static constexpr uint8_t REG_MODE = 0x04;  // Device mode byte (read-only, factory use)
-static constexpr uint8_t REG_CT_MODEL = 0x05;  // SCT-013 SKU 0=unset/1=-005/2=-010/3=-030/4=-050/5=-100/6=-020/7=-060 (v1.3). Direct write applies preset to ch
+static constexpr uint8_t REG_CT_MODEL = 0x05;  // CT model code; meaning is PER-CLASS (see SENSOR_CLASS 0x25). ACCEPTED (class,model) sets — codes without a CT_
 static constexpr uint8_t REG_V03_PHASE_SAMPLES = 0x06;  // U-vs-I sample advance, 0..30. Factory-gated write (v1.3). Save via CMD_SAVE_GAINS.
 static constexpr uint8_t REG_V03_PERIOD_VALID = 0x07;  // Set by CMD_LATCH_PERIOD: 1=fresh snapshot, 0=empty accumulator (race). NOT cleared-on-read. Failed latch does 
 static constexpr uint8_t REG_LUT_VALID_MASK = 0x08;  // bit n = slot n has valid LUT
@@ -54,7 +54,7 @@ static constexpr uint8_t REG_AC_FREQ = 0x20;  // 50 or 60
 static constexpr uint8_t REG_AC_PERIOD = 0x21;  // Mains half-period
 static constexpr uint8_t REG_AC_PERIOD_SIZE = 2;
 static constexpr uint8_t REG_CALIBRATION = 0x23;  // Legacy calibration status byte
-static constexpr uint8_t REG_TOPOLOGY = 0x24;  // 1=SINGLE, 2=SPLIT_PHASE, 3=THREE_PHASE (=V03_N_I)
+static constexpr uint8_t REG_TOPOLOGY = 0x24;  // Number of I channels (=V03_N_I): 1, 2, 3 junior; 5=UI5, 7=UI7 senior. Canonical semantics is the COUNT (2026-0
 static constexpr uint8_t REG_SENSOR_CLASS = 0x25;  // 0=UNSET, 1=SCT_013, 2=WIRED_CT, 3=BUILTIN_CT. Class change resets CT_MODEL=0.
 static constexpr uint8_t REG_V03_PHASE_FRACT = 0x26;  // Sub-sample phase shift Q8. Factory-gated write (v1.3). Save via CMD_SAVE_GAINS.
 static constexpr uint8_t REG_FLEET_CONFIG = 0x27;  // bit0=GC_ENABLE (General-Call latch reception; effective after reset - ENGC not toggled live). bits1-7 reserved
@@ -68,6 +68,9 @@ static constexpr uint8_t REG_THRESH_P_HI = 0x2E;  // Power threshold → EVENT_F
 static constexpr uint8_t REG_THRESH_P_HI_SIZE = 2;
 static constexpr uint8_t REG_I2C_ADDRESS = 0x30;  // v1.3 two-phase: write candidate (0x08..0x77) -> RAM only (reads return staged value); arm ADDR_COMMIT_MAGIC th
 static constexpr uint8_t REG_ADDR_COMMIT_MAGIC = 0x31;  // Write 0xA5 to arm CMD_COMMIT_ADDR; consumed (cleared) on commit attempt. Write-only - reads return 0x00
+static constexpr uint8_t REG_CHANNEL_SELECT = 0x32;  // (field << 4) | channel. Writing snapshots the selected value into CHANNEL_DATA - RE-SELECT BEFORE EVERY READ (
+static constexpr uint8_t REG_CHANNEL_DATA = 0x3C;  // Four independent 1-byte registers 0x3C-0x3F (single-byte masters work). Read: float32 LE (u16 LE zero-padded f
+static constexpr uint8_t REG_CHANNEL_DATA_SIZE = 4;
 static constexpr uint8_t REG_UPTIME_S = 0x46;  // Seconds since boot
 static constexpr uint8_t REG_UPTIME_S_SIZE = 4;
 static constexpr uint8_t REG_RESET_CAUSE = 0x4A;  // Last reset reason flags from RCC_CSR: bit0=PIN, bit1=POR/BOR, bit2=SW, bit3=IWDG, bit4=WWDG, bit5=LPWR
@@ -80,7 +83,7 @@ static constexpr uint8_t REG_CT_MODEL_CH0 = 0x51;  // v1.3 D-1.3: CT model actua
 static constexpr uint8_t REG_CT_MODEL_CH1 = 0x52;  // Model applied to channel 1
 static constexpr uint8_t REG_CT_MODEL_CH2 = 0x53;  // Model applied to channel 2
 static constexpr uint8_t REG_PRODUCT_ID = 0x54;  // Product family: 0x01=rbAmp sensor, 0x02=rbDimmer (own map!). Master MUST read before interpreting family-speci
-static constexpr uint8_t REG_HW_VARIANT = 0x55;  // BUILD_VARIANT: 1=UI1, 2=UI2, 3=UI3, 4=I1, 5=I2, 6=I3
+static constexpr uint8_t REG_HW_VARIANT = 0x55;  // BUILD_VARIANT: 1=UI1, 2=UI2, 3=UI3, 4=I1, 5=I2, 6=I3, 7=UI5, 8=UI7. Senior parts report the BUILD_VARIANT code
 static constexpr uint8_t REG_FW_TIER = 0x56;  // bits0-1: 0=BASIC,1=STANDARD,2=PRO; bit2=bidirectional; bit3=LUT-calibrated
 static constexpr uint8_t REG_CAPABILITY = 0x57;  // Feature bitmap (see capability_bits). Libraries branch on bits, never on VERSION heuristics
 static constexpr uint8_t REG_CAPABILITY_SIZE = 2;
@@ -264,6 +267,13 @@ static constexpr uint8_t EVENT_THRESH_P = (1u << 2);
 static constexpr uint8_t EVENT_ERROR = (1u << 3);
 static constexpr uint8_t EVENT_CONFIG_CHANGED = (1u << 4);
 static constexpr uint8_t EVENT_RESET_OCCURRED = (1u << 5);
+
+// ---- CHANNEL_SELECT (0x32) window fields (high nibble; 4-12 reserved) ----
+static constexpr uint8_t CHFIELD_I_RMS = 0;
+static constexpr uint8_t CHFIELD_I_PEAK = 1;
+static constexpr uint8_t CHFIELD_P_REAL = 2;
+static constexpr uint8_t CHFIELD_PF = 3;
+static constexpr uint8_t CHFIELD_PERIOD_AVG_P = 13;
 
 // ---- Extended address space (0xFF-prefix, 16-bit) — reserved layout ----
 //   0x0100-0x011F: Bidirectional: PERIOD_AVG_P_NEG[3] f32, E_NEG accumulators (decision 5.3: F4 tiers only)

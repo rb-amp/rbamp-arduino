@@ -15,7 +15,7 @@
 
 namespace rbamp {
 
-static constexpr uint32_t RBAMP_REG_SCHEMA_CRC32 = 0x8D38A1C2U;
+static constexpr uint32_t RBAMP_REG_SCHEMA_CRC32 = 0x21D3062CU;
 static constexpr uint16_t RBAMP_PROTOCOL_VERSION = 0x014CU; // MAJOR.MINOR packed, e.g. 1.0 -> 0x0100
 
 // ---- Register addresses ----
@@ -35,9 +35,6 @@ static constexpr uint8_t REG_LUT_VIEW_INL_MAX_L         = 0x0C; // uint16 LE LSB
 static constexpr uint8_t REG_LUT_VIEW_INL_MAX_H         = 0x0D; // uint16 LE MSB
 static constexpr uint8_t REG_LUT_VIEW_DNL_MAX_L         = 0x0E; // uint16 LE LSB — measured DNL_max
 static constexpr uint8_t REG_LUT_VIEW_DNL_MAX_H         = 0x0F; // uint16 LE MSB
-static constexpr uint8_t REG_DIM0_LEVEL                 = 0x10; // Brightness 0..100
-static constexpr uint8_t REG_DIM0_CURVE                 = 0x11; // 0=LINEAR, 1=RMS, 2=LOG
-static constexpr uint8_t REG_DIM0_FADE_TIME             = 0x18; // Fade time, 0 = off
 static constexpr uint8_t REG_AC_FREQ                    = 0x20; // Detected mains frequency: 50 or 60
 static constexpr uint8_t REG_AC_PERIOD_L                = 0x21; // Half-period us LSB (uint16 LE with AC_PERIOD_H)
 static constexpr uint8_t REG_AC_PERIOD_H                = 0x22; // Half-period us MSB
@@ -65,42 +62,7 @@ static constexpr uint8_t REG_FAN_SPEED                  = 0x50; // Current PWM %
 static constexpr uint8_t REG_FAN_TARGET                 = 0x51; // Manual target PWM %
 static constexpr uint8_t REG_FAN_MODE                   = 0x52; // 0=OFF, 1=AUTO, 2=MANUAL, 3=HYBRID, 4=FULL
 static constexpr uint8_t REG_FAN_STATUS                 = 0x53; // Status flags
-static constexpr uint8_t REG_CS_CONFIG                  = 0x54; // bit0 = CH0 enable (backward compat)
 static constexpr uint8_t REG_HW_VARIANT                 = 0x55; // Hardware SKU: 1=UI1, 2=UI2, 3=UI3, 4=I1, 5=I2, 6=I3. Authoritative variant detection (do NOT NACK-probe channel registers).
-static constexpr uint8_t REG_CS_INTERVAL_H              = 0x56; // No-op (kept for compat)
-static constexpr uint8_t REG_CS0_SENSOR_TYPE            = 0x57; // ACS712 sensitivity (e.g. 66 = ACS712-30A)
-static constexpr uint8_t REG_ACC_SEL                    = 0x58; // Select accumulator 0..7 for register window
-static constexpr uint8_t REG_COMMIT                     = 0x59; // Write N (0..7): commit accumulator N, clear PA2
-static constexpr uint8_t REG_CS0_MODE                   = 0x5A; // 0=current (ACS712), 1=voltage (ZMPT107)
-static constexpr uint8_t REG_CS0_NOISE_FLOOR            = 0x5B; // Quadrature subtraction noise floor
-static constexpr uint8_t REG_CS_PERIOD_BUFS_2           = 0x5C; // No-op (kept for compat)
-static constexpr uint8_t REG_CS_PERIOD_BUFS_3           = 0x5D; // No-op (kept for compat)
-static constexpr uint8_t REG_CS_PERIOD_BUFS_L           = 0x5E; // No-op (kept for compat)
-static constexpr uint8_t REG_CS_PERIOD_BUFS_H           = 0x5F; // No-op (kept for compat)
-static constexpr uint8_t REG_CS0_STATUS                 = 0x60; // bit0=valid, bit1=rt_mode, bit7:5=acc_n. Reading latches snapshot.
-static constexpr uint8_t REG_CS0_RMS_L                  = 0x61; // uint16 LE LSB — RMS current (mA)
-static constexpr uint8_t REG_CS0_RMS_H                  = 0x62; // uint16 LE MSB
-static constexpr uint8_t REG_CS0_PEAK_L                 = 0x63; // uint16 LE LSB — Peak current (mA)
-static constexpr uint8_t REG_CS0_PEAK_H                 = 0x64; // uint16 LE MSB
-static constexpr uint8_t REG_CS0_DIR                    = 0x65; // DC bias direction: +1 / 0 / -1
-static constexpr uint8_t REG_CS0_PERIOD_IDX             = 0x66; // Monotonic period counter (wraps 0..255)
-static constexpr uint8_t REG_CS0_DUR_0                  = 0x67; // uint32 LE byte 0 — Duration (ms)
-static constexpr uint8_t REG_CS0_DUR_1                  = 0x68; // uint32 LE byte 1
-static constexpr uint8_t REG_CS0_DUR_2                  = 0x69; // uint32 LE byte 2
-static constexpr uint8_t REG_CS0_DUR_3                  = 0x6A; // uint32 LE byte 3 (MSB)
-static constexpr uint8_t REG_CS0_SMPL_0                 = 0x6B; // uint32 LE byte 0 — Sample count
-static constexpr uint8_t REG_CS0_SMPL_1                 = 0x6C; // uint32 LE byte 1
-static constexpr uint8_t REG_CS0_SMPL_2                 = 0x6D; // uint32 LE byte 2
-static constexpr uint8_t REG_CS0_SMPL_3                 = 0x6E; // uint32 LE byte 3 (MSB)
-static constexpr uint8_t REG_CS0_MIN_L                  = 0x6F; // uint16 LE LSB — Min ADC value
-static constexpr uint8_t REG_CS0_MIN_H                  = 0x70; // uint16 LE MSB
-static constexpr uint8_t REG_CS0_MAX_L                  = 0x71; // uint16 LE LSB — Max ADC value
-static constexpr uint8_t REG_CS0_MAX_H                  = 0x72; // uint16 LE MSB
-static constexpr uint8_t REG_CS0_DC_L                   = 0x73; // int16 LE LSB — DC offset (signed ADC units)
-static constexpr uint8_t REG_CS0_DC_H                   = 0x74; // int16 LE MSB
-static constexpr uint8_t REG_CS0_CREST_L                = 0x75; // uint16 LE LSB — Crest factor x100 (141=pure sine)
-static constexpr uint8_t REG_CS0_CREST_H                = 0x76; // uint16 LE MSB
-static constexpr uint8_t REG_CS0_RESERVED               = 0x77; // Reserved (future THD)
 static constexpr uint8_t REG_VS_STATUS                  = 0x78; // bit7=NO_HW (no voltage hardware), bit0=data_ready
 static constexpr uint8_t REG_VS_RMS_L                   = 0x79; // uint16 LE LSB — voltage RMS (0.1 V units)
 static constexpr uint8_t REG_VS_RMS_H                   = 0x7A; // uint16 LE MSB

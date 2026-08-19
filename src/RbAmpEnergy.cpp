@@ -9,7 +9,7 @@
 #include "RbAmpEnergy.h"
 
 RbAmpEnergy::RbAmpEnergy() noexcept
-    : wh_{0.0, 0.0, 0.0}, enabled_(true), dropped_dt_count_(0) {}
+    : wh_{}, enabled_(true), dropped_dt_count_(0) {}
 
 void RbAmpEnergy::tick(const RbAmpPeriodSnapshot& snap, uint8_t channels) noexcept {
     if (!enabled_ || !snap.valid) {
@@ -31,27 +31,31 @@ void RbAmpEnergy::tick(const RbAmpPeriodSnapshot& snap, uint8_t channels) noexce
         dropped_dt_count_++;
         return;
     }
-    const uint8_t n = (channels > 3) ? 3 : channels;
+    const uint8_t n = (channels > RBAMP_MAX_CHANNELS) ? RBAMP_MAX_CHANNELS : channels;
     for (uint8_t ch = 0; ch < n; ++ch) {
-        /* E_Wh += avg_p_W * dt_s / 3600  — see SPEC §7. */
+        /* E_Wh += avg_p_W * dt_s / 3600  — see SPEC §7. avg_p[ch>=3] comes from
+         * the channel window field 13 (PERIOD_AVG_P), latched atomically with
+         * the flat ch0-2 trio by CMD_LATCH_PERIOD. */
         wh_[ch] += static_cast<double>(snap.avg_p[ch]) * dt_s / 3600.0;
     }
 }
 
 double RbAmpEnergy::wh(uint8_t ch) const noexcept {
-    if (ch > 2) {
+    if (ch >= RBAMP_MAX_CHANNELS) {
         return 0.0;
     }
     return wh_[ch];
 }
 
 void RbAmpEnergy::reset(uint8_t ch) noexcept {
-    if (ch > 2) {
+    if (ch >= RBAMP_MAX_CHANNELS) {
         return;
     }
     wh_[ch] = 0.0;
 }
 
 void RbAmpEnergy::resetAll() noexcept {
-    wh_[0] = wh_[1] = wh_[2] = 0.0;
+    for (uint8_t ch = 0; ch < RBAMP_MAX_CHANNELS; ++ch) {
+        wh_[ch] = 0.0;
+    }
 }

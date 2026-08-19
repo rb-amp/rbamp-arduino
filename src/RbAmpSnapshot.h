@@ -19,6 +19,17 @@
 #include <stdint.h>
 
 /**
+ * @brief Maximum current channels across all SKUs (UI7 / I7 = 7).
+ *
+ * Sizes the per-channel arrays in RbAmpSnapshot / RbAmpPeriodSnapshot and the
+ * Wh accumulator. Junior SKUs (1..3 channels) leave the tail filled with 0.
+ * Call RbAmp::channels() for the count actually populated.
+ */
+#ifndef RBAMP_MAX_CHANNELS
+#define RBAMP_MAX_CHANNELS 7
+#endif
+
+/**
  * @brief Variant topology — populated by RbAmp::begin() from REG_HW_VARIANT (0x55).
  *
  * Reflects how many independent current channels the device firmware exposes.
@@ -34,6 +45,8 @@ enum class RbAmpTopology : uint8_t {
     Single      = 1,   /**< 1 current channel (UI1 / I1). */
     SplitPhase  = 2,   /**< 2 current channels (UI2 / I2). */
     ThreePhase  = 3,   /**< 3 current channels (UI3 / I3). */
+    Five        = 5,   /**< 5 current channels (UI5) — senior SKU. */
+    Seven       = 7,   /**< 7 current channels (UI7) — senior SKU. */
 };
 
 /**
@@ -55,6 +68,8 @@ enum class RbAmpVariant : uint8_t {
     I1      = 4,   /**< 1 current only (no voltage / power). */
     I2      = 5,   /**< 2 current only. */
     I3      = 6,   /**< 3 current only. */
+    UI5     = 7,   /**< 5 current + voltage + power (senior SKU, F040). */
+    UI7     = 8,   /**< 7 current + voltage + power (senior SKU, F040). */
 };
 
 /**
@@ -132,10 +147,10 @@ static const uint8_t RBAMP_FIELD_FREQUENCY = 1u << 4;
 struct RbAmpSnapshot {
     float voltage;          /**< RMS voltage at REG_V03_U_RMS (0x86) in V. */
     float voltage_peak;     /**< Peak voltage at REG_V03_U_PEAK (0x8A) in V. */
-    float current[3];       /**< RMS current per channel in A. */
-    float current_peak[3];  /**< Peak current per channel in A. */
-    float power[3];         /**< Real power per channel in W (signed; negative = export). */
-    float power_factor[3];  /**< Power factor per channel, dimensionless (-1..+1). */
+    float current[RBAMP_MAX_CHANNELS];       /**< RMS current per channel in A. */
+    float current_peak[RBAMP_MAX_CHANNELS];  /**< Peak current per channel in A. */
+    float power[RBAMP_MAX_CHANNELS];         /**< Real power per channel in W (signed; negative = export). */
+    float power_factor[RBAMP_MAX_CHANNELS];  /**< Power factor per channel, dimensionless (-1..+1). */
     float frequency;        /**< Mains frequency at REG_AC_FREQ (0x20) in Hz. */
     RbAmpTopology topology; /**< Variant detected at begin(). */
     uint8_t channels;       /**< 1..3 — number of valid channels in arrays. */
@@ -159,7 +174,7 @@ struct RbAmpSnapshot {
  * @see SPEC §7 — Period-metering state machine.
  */
 struct RbAmpPeriodSnapshot {
-    float avg_p[3];      /**< Average real power per channel over the latched period (W). */
+    float avg_p[RBAMP_MAX_CHANNELS]; /**< Average real power per channel over the latched period (W). */
     float max_p;         /**< Peak real power on channel 0 during the period (W). */
     uint32_t latch_ms;   /**< Device-reported period duration (diagnostic, do not use for energy). */
     uint32_t master_dt_ms; /**< Master's wall-clock dt since previous successful latch (ms). */
