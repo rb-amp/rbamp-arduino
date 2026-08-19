@@ -40,8 +40,8 @@ ground-truth (38/38 full-coverage suite, plus an extended app-WDT soak).
   uncharacterised and rejected client-side. `REG_CT_MODEL` is pure staging:
   binding is via the per-channel command, so multi-channel binds are
   order-independent and never clobber channel 0.
-- **Address change** is a production-OK two-phase magic commit — no develop mode
-  required.
+- **Address change** is a production-OK two-phase magic commit — no special/factory
+  mode required.
 - **Variant detection** reads `REG_HW_VARIANT`; the constructor topology hint is
   now a fallback for pre-v1.3 firmware. The default hint is `Single` (safe — no
   spurious polls of absent channels).
