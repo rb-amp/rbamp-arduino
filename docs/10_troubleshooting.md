@@ -703,7 +703,7 @@ call. `RbAmp::errorString(code)` returns a human-readable string.
 | `RB_ERR_NOT_READY` (-4) | "Device not ready" | (reserved) | — |
 | `RB_ERR_STALE` (-5) | "Period snapshot stale" | the period-ready flag = 0 | "Period snapshots are always stale" section |
 | `RB_ERR_PARAM` (-6) | "Bad parameter" | invalid channel index / invalid model code / invalid address range | "setSensorClass() / setCTModel() returns RB_ERR_PARAM" section |
-| `RB_ERR_MODE` (-7) | "Operation requires develop mode" | a factory-only operation (for example `saveGains()` in production) | do not call factory-only operations on production firmware — these are blocked by design |
+| `RB_ERR_MODE` (-7) | "Operation requires factory mode" | a factory-only operation (for example `saveGains()` in production) | do not call factory-only operations on production firmware — these are blocked by design |
 | `RB_ERR_CHECKSUM` (-8) | "Codegen parity mismatch" | (reserved for codegen CI) | — |
 | `RB_ERR_VERSION` (-9) | "Unsupported firmware version" | `REG_VERSION` = 0 / 0xFF | check the module connection |
 | `RB_ERR_NOT_IMPLEMENTED` (-10) | "Not implemented" | (reserved) | — |

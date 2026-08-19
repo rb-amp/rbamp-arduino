@@ -41,7 +41,7 @@ app-WDT soak).
   `REG_CT_MODEL` is pure staging: bind via the per-channel command,
   multi-channel binds are **order-independent**, and never clobber
   channel 0.
-- **Address change** is a production-OK two-phase magic commit; develop
+- **Address change** is a production-OK two-phase magic commit; factory
   mode is **not required**.
 - **Variant detection** reads `REG_HW_VARIANT`; the constructor topology
   hint is now a fallback for pre-v1.3 firmware. The default hint is

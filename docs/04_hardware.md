@@ -503,7 +503,7 @@ handle, but the fleet calls degenerate into trivial ones).
 The default factory address is `0x50`. Every new or replacement module
 goes through **provisioning** (once): reassignment from `0x50` to a
 working address + optional saving of the configuration (CT models,
-group_id, label) to flash. Develop-mode is **not required** —
+group_id, label) to flash. Factory-mode is **not required** —
 the address change works directly in production via two-phase address commit.
 
 #### Method 1 — `RbAmpFleet::provision()` (recommended)

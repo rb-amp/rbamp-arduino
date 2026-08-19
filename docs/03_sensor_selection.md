@@ -415,7 +415,7 @@ Three strategies in increasing order of complexity:
    `setCTModel()`. Until the program is complete, specific accuracy
    figures at low currents are not published.
 
-## Production vs Develop mode (persistence reference)
+## Production vs Factory mode (persistence reference)
 
 The rbAmp module operates in two modes that differ in **what exactly is saved to flash**. The current mode is read from the corresponding status register.
 
@@ -429,7 +429,7 @@ The rbAmp module operates in two modes that differ in **what exactly is saved to
 | `CMD_SAVE_GAINS` | ❌ **BLOCKED** in production (silent reject; `REG_ERROR=0xFE`; reboot reverts) | gains / NF / phase (factory cal) |
 | `CMD_FACTORY_RESET` | ❌ **BLOCKED** in production | — |
 
-In production mode, writes of factory calibration (`CMD_SAVE_GAINS`, `CMD_FACTORY_RESET`) are **rejected by the firmware** — this protects against accidentally overwriting the factory coefficients. Deploying develop mode is a manufacturer-side operation.
+In production mode, writes of factory calibration (`CMD_SAVE_GAINS`, `CMD_FACTORY_RESET`) are **rejected by the firmware** — this protects against accidentally overwriting the factory coefficients. Deploying factory mode is a manufacturer-side operation.
 
 > **Read-back ≠ persistence** (HW-verified A.7). The production guard accepts a write into RAM (a subsequent read returns what was written), but the flash save may be rejected. After a reboot the value **reverts**. **The only valid way to confirm persistence is to reboot the module via `CMD_RESET` and read again**:
 >

@@ -296,7 +296,7 @@ The single-parameter form — sets the CT clamp model **on channel 0
 only**. Convenient for single-channel SKUs (UI1/I1); on multi-channel
 ones it is equivalent to `setCTModel(0, code)`.
 
-Sequence: write `REG_CT_MODEL` (0x05) → `CMD_SET_CT_MODEL_CH0` (opcode 0x28) → 5 ms settle → `CMD_SAVE_USER_CONFIG` (opcode 0x32) → 700 ms. **Production-OK** — uses the user-config save path, no develop-mode gating.
+Sequence: write `REG_CT_MODEL` (0x05) → `CMD_SET_CT_MODEL_CH0` (opcode 0x28) → 5 ms settle → `CMD_SAVE_USER_CONFIG` (opcode 0x32) → 700 ms. **Production-OK** — uses the user-config save path, no factory-mode gating.
 
 | `code` | Model |
 |:---:|---|
@@ -357,7 +357,7 @@ uint8_t applied_ch2 = dev.readReg(0x53);
 
 **Returns**: `true` on success.
 
-#### `bool saveGains() noexcept` — develop-mode only
+#### `bool saveGains() noexcept` — factory-mode only
 
 A "bare" `CMD_SAVE_GAINS` (0x26) write — the **factory** persistence
 path for calibration coefficients (gains / noise floor / phase).
@@ -377,7 +377,7 @@ path for calibration coefficients (gains / noise floor / phase).
 
 #### `bool prepareAddressChange(uint8_t new_addr) noexcept`
 
-Step 1 of 2 for changing the module's I²C address. **Production-OK** on the current firmware (v1.3 two-phase commit, no develop-mode gating for the address).
+Step 1 of 2 for changing the module's I²C address. **Production-OK** on the current firmware (v1.3 two-phase commit, no factory-mode gating for the address).
 
 Sequence: validate the `new_addr` range (0x08..0x77, ≠ current) → write the candidate to `REG_I2C_ADDRESS (0x30)` in RAM → write magic `0xA5` to `REG_ADDR_COMMIT_MAGIC (0x31)` — armed. The caller must call `commitAddressChange()` within 5 seconds, otherwise the arming expires.
 
@@ -393,7 +393,7 @@ Sequence: check the freshness of the magic-armed state → `CMD_COMMIT_ADDR (opc
 
 > ⚠ **Verification path** (v1.3 Fix 4): after reboot `REG_I2C_ADDRESS (0x30)` reads the **active address**. A bus scan at the new address also works to confirm the commit.
 
-> Historical: before the v1.3 fixes the address change was incorrectly documented as develop-only. Per the v1.3 A2 canon it is a **production operation**.
+> Historical: before the v1.3 fixes the address change was incorrectly documented as factory-only. Per the v1.3 A2 canon it is a **production operation**.
 > The I²C address — the documented path is reconfiguration via the
 > factory bench (outside the library's scope).
 
@@ -1152,7 +1152,7 @@ namespace rbamp {
     constexpr int8_t RB_ERR_NOT_READY       = -4;   // (reserved)
     constexpr int8_t RB_ERR_STALE           = -5;   // period snapshot not ready
     constexpr int8_t RB_ERR_PARAM           = -6;   // invalid channel / address / precondition
-    constexpr int8_t RB_ERR_MODE            = -7;   // operation requires develop mode
+    constexpr int8_t RB_ERR_MODE            = -7;   // operation requires factory mode
     constexpr int8_t RB_ERR_CHECKSUM        = -8;   // (reserved)
     constexpr int8_t RB_ERR_VERSION         = -9;   // REG_VERSION returned 0 or 0xFF
     constexpr int8_t RB_ERR_NOT_IMPLEMENTED = -10;  // (reserved for future firmware versions)
@@ -1227,7 +1227,7 @@ for (int i = 0; i < 8; i++) {
 }
 ```
 
-Affects writable multi-byte registers: `LABEL` (0x68-0x6F), `U_GAIN`/`I_GAIN` (f32, develop-gated), `NF` (u16), `THRESH` (u16). Reads — burst OK.
+Affects writable multi-byte registers: `LABEL` (0x68-0x6F), `U_GAIN`/`I_GAIN` (f32, factory-gated), `NF` (u16), `THRESH` (u16). Reads — burst OK.
 
 **Exception**: the GC broadcast frame (5 bytes `A5 27 g tl th` to addr `0x00`) is a **separate wire-protocol path** (general-call reception, not a register write), sent as a single transaction. See scenario 12 in [06 · Examples](06_examples.md).
 
