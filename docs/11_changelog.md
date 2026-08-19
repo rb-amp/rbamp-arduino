@@ -1,5 +1,28 @@
 # 11 · Changelog
 
+## 1.4.0 — Senior-SKU support (UI5/UI7)
+
+Adds support for the 7-channel senior-SKU modules (UI5, UI7) and
+refreshes the GC broadcast example. Silicon-verified on a heterogeneous
+fleet (UI1/UI2/UI3/UI5/UI7), firmware contract bd2ad8e.
+
+### Added
+
+- **`09_SeniorSku` example** — 7-channel polling + energy integration
+  for UI5/UI7 modules.
+- **`readCommitSeq()`** — firmware commit-sequence readback.
+
+### Changed
+
+- **`RBAMP_MAX_CHANNELS`** raised from 3 to 7. Existing sketches that
+  use `RbAmpSnapshot` arrays will grow — **recompile required** (no
+  source changes needed unless you hard-coded array sizes).
+- **`03_MultiModuleBroadcast`** rewritten for v1.3 General-Call
+  broadcast latch (coherent single-frame sync replaces the old
+  per-device sequential latch).
+- Regenerated register headers (v1.4.0 contract).
+- Energy/Snapshot: senior-SKU array growth + channel-count dispatch.
+
 ## 1.3.0 — Fleet + v1.3 protocol
 
 Brought the Arduino library into line with the rbAmp v1.3 wire contract
