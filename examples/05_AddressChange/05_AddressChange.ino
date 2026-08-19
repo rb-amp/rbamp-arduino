@@ -5,7 +5,7 @@
  * Demonstrates:
  *  - Two-step API: prepareAddressChange() arms the change; commitAddressChange()
  *    must follow within 5 seconds. The commit is a production-OK two-phase
- *    magic sequence (no develop/factory mode required on v1.3 firmware).
+ *    magic sequence (no special/factory mode required on v1.3 firmware).
  *  - Automatic update of the internal address field — subsequent reads
  *    target the new address with no manual change.
  *
