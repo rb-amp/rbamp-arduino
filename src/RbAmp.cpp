@@ -301,6 +301,34 @@ bool RbAmp::foldChannelWindow(uint8_t ch, uint8_t field, float& out_field,
                      out_field, mask, bit);
 }
 
+bool RbAmp::writeChannelModel(uint8_t ch, uint8_t code) noexcept {
+    /* Per-channel CT model via the window, field 15 (CT_MODEL). Select then write
+     * the four data bytes LSB-first — the firmware does NOT support a burst, so
+     * each byte is its own transaction and the preset is applied on the 0x3F
+     * write. Only the low byte carries the model code. Caller has already
+     * validated ch < channels_ and fw >= 0x0A. */
+    const uint8_t sel = static_cast<uint8_t>((v2::CHFIELD_CT_MODEL << 4) | (ch & 0x0F));
+    if (!writeReg(v2::REG_CHANNEL_SELECT, sel) ||
+        !writeReg(static_cast<uint8_t>(v2::REG_CHANNEL_DATA + 0), code) ||
+        !writeReg(static_cast<uint8_t>(v2::REG_CHANNEL_DATA + 1), 0) ||
+        !writeReg(static_cast<uint8_t>(v2::REG_CHANNEL_DATA + 2), 0) ||
+        !writeReg(static_cast<uint8_t>(v2::REG_CHANNEL_DATA + 3), 0)) {
+        setError(RB_ERR_IO);
+        return false;
+    }
+    return true;
+}
+
+float RbAmp::readChannelMetric(uint8_t ch, uint8_t field,
+                               uint8_t flat_base, float max_abs) noexcept {
+    /* Single ch<3 / ch>=3 routing point for the contiguous RT metrics (L8):
+     * ch0-2 = flat block (base + ch*4); ch3+ = channel window. */
+    if (ch >= 3) {
+        return readChannelWindow(ch, field, max_abs);
+    }
+    return readRtFloat(flat_base, ch, 4, max_abs);
+}
+
 float RbAmp::readVoltage(uint8_t phase) noexcept {
     if (phase != 0) {
         setError(RB_ERR_PARAM);
@@ -330,24 +358,19 @@ float RbAmp::readVoltagePeak(uint8_t phase) noexcept {
 }
 
 float RbAmp::readCurrent(uint8_t ch) noexcept {
-    /* ch0-2 = flat block; ch3+ = channel access window (senior SKUs). */
-    if (ch >= 3) return readChannelWindow(ch, v2::CHFIELD_I_RMS, 150.0f);
-    return readRtFloat(REG_V03_I0_RMS, ch, 4, 150.0f);
+    return readChannelMetric(ch, v2::CHFIELD_I_RMS, REG_V03_I0_RMS, 150.0f);
 }
 
 float RbAmp::readCurrentPeak(uint8_t ch) noexcept {
-    if (ch >= 3) return readChannelWindow(ch, v2::CHFIELD_I_PEAK, 250.0f);
-    return readRtFloat(REG_V03_I0_PEAK, ch, 4, 250.0f);
+    return readChannelMetric(ch, v2::CHFIELD_I_PEAK, REG_V03_I0_PEAK, 250.0f);
 }
 
 float RbAmp::readPower(uint8_t ch) noexcept {
-    if (ch >= 3) return readChannelWindow(ch, v2::CHFIELD_P_REAL, 30000.0f);
-    return readRtFloat(REG_V03_P0_REAL, ch, 4, 30000.0f);
+    return readChannelMetric(ch, v2::CHFIELD_P_REAL, REG_V03_P0_REAL, 30000.0f);
 }
 
 float RbAmp::readPowerFactor(uint8_t ch) noexcept {
-    if (ch >= 3) return readChannelWindow(ch, v2::CHFIELD_PF, 1.5f);
-    return readRtFloat(REG_V03_PF0, ch, 4, 1.5f);
+    return readChannelMetric(ch, v2::CHFIELD_PF, REG_V03_PF0, 1.5f);
 }
 
 float RbAmp::readFrequency() noexcept {
@@ -584,33 +607,28 @@ bool RbAmp::setSensorClass(RbAmpSensorClass cls) noexcept {
         setError(RB_ERR_IO);
         return false;
     }
-    if (!writeCmd(CMD_SAVE_GAINS)) {
-        setError(RB_ERR_IO);
-        return false;
+    /* SENSOR_CLASS is user_config — persist via CMD_SAVE_USER_CONFIG (ungated).
+     * CMD_SAVE_GAINS is factory/develop-gated and a silent no-op in production. */
+    if (!saveUserConfig()) {
+        return false;  /* error already set */
     }
-    delay(SETTLE_MS_SAVE_GAINS);
     setError(RB_OK);
     return true;
 }
 
 bool RbAmp::ctModelValid(RbAmpSensorClass cls, uint8_t code) noexcept {
-    /* Per-class accepted CT SKUs (A1) — non-contiguous, mirrors the esp-idf
-     * reference _ct_model_valid. Codes 5 (SCT-013-100) and 7 (-060) are
-     * recognised SKUs but uncharacterised → rejected. Firmware is the ultimate
-     * authority; this is a client fast-fail to avoid burning a flash cycle. */
-    switch (cls) {
-        case RbAmpSensorClass::Sct013:
-            return code == 1 || code == 2 || code == 3 || code == 4 || code == 6;
-        case RbAmpSensorClass::WiredCT:
-            return code == 1 || code == 2 || code == 3;
-        case RbAmpSensorClass::BuiltinCT:
-        default:
-            return false;  /* per-unit factory cal, no presets */
-    }
+    /* v1.5.0: the accepted-set is no longer a hand-maintained whitelist — it
+     * drifted (WIRED_CT was absent entirely). This is now a KNOWN-CODE check
+     * against the generated registry (RbAmpSensorModels.h ← sensor_models.yaml).
+     * A registry hit does NOT mean the connected module accepts the code:
+     * acceptance is runtime truth — the module returns ERR_PARAM for a code
+     * without a preset row and keeps the channel's previous model. This fast-
+     * fail only rejects codes that are not in the registry at all (typos). */
+    return rbamp_sensor_model_lookup(static_cast<uint8_t>(cls), code) != nullptr;
 }
 
 bool RbAmp::setCTModel(uint8_t code) noexcept {
-    if (code < 1 || code > 7) {
+    if (code < 1) {  /* 0 = unset; upper bound is registry-checked below (v1.5.0) */
         setError(RB_ERR_PARAM);
         return false;
     }
@@ -649,11 +667,13 @@ bool RbAmp::setCTModel(uint8_t code) noexcept {
         return false;
     }
     delay(SETTLE_MS_SET_CT_MODEL_CH0);
-    return saveGains();
+    return saveUserConfig();  /* CT_MODEL is user_config — SAVE_GAINS is dev-gated (silent no-op in production) */
 }
 
 bool RbAmp::setCTModel(uint8_t channel, uint8_t code) noexcept {
-    if (channel >= 3 || code < 1 || code > 7) {
+    /* v1.5.0: validate against the module's actual channel count, not a hardcoded
+     * 3 — senior SKUs (UI5/UI7) bind ch3+ via the window (field 15). */
+    if (channel >= channels_ || code < 1) {
         setError(RB_ERR_PARAM);
         return false;
     }
@@ -680,15 +700,41 @@ bool RbAmp::setCTModel(uint8_t channel, uint8_t code) noexcept {
         setError(RB_ERR_PARAM);
         return false;
     }
-    if (!ctModelValid(static_cast<RbAmpSensorClass>(cls), code)) {  /* A1 fast-fail */
+    if (!ctModelValid(static_cast<RbAmpSensorClass>(cls), code)) {  /* known-code fast-fail */
         setError(RB_ERR_PARAM);
         return false;
     }
-    /* v1.3 A1 sequence (order-independent — REG_CT_MODEL is pure staging):
+
+    if (channel >= 3) {
+        /* Senior channel: bind via the channel window, field 15 (CT_MODEL). The
+         * flat CMD_SET_CT_MODEL_CHn opcodes only cover ch0-2. Needs v1.4.18+
+         * (fw ver 0x0A) where field 15 is signed on silicon. */
+        if (fw < 0x0A) {
+            setError(RB_ERR_VERSION);
+            return false;
+        }
+        if (!writeChannelModel(channel, code)) {
+            return false;  /* error already set (RB_ERR_IO) */
+        }
+        /* Acceptance is runtime: an unknown (class,model) leaves the channel's
+         * previous model in place. Read the applied model back and surface a
+         * mismatch as RB_ERR_PARAM (readback-confirmed per test rule). */
+        uint8_t applied = 0;
+        if (!readCTModelCh(channel, applied)) {
+            return false;  /* error already set */
+        }
+        if (applied != code) {
+            setError(RB_ERR_PARAM);
+            return false;
+        }
+        return saveUserConfig();  /* CT_MODEL is user_config — SAVE_GAINS is dev-gated (silent no-op in production) */
+    }
+
+    /* v1.3 A1 sequence (ch0-2, order-independent — REG_CT_MODEL is pure staging):
      *  1. Write REG_CT_MODEL = code  (stages the preset; no channel binds yet).
      *  2. Write REG_COMMAND = CMD_SET_CT_MODEL_CH<channel>  — binds the staged
      *     code to THIS channel only (5 ms settle for in-RAM preset lookup).
-     *  3. CMD_SAVE_GAINS (700 ms) to persist NF/GAIN mirrors to flash.
+     *  3. CMD_SAVE_USER_CONFIG (700 ms) to persist the model (user_config).
      * For multiple channels prefer configureChannels() (batched single save). */
     if (!writeReg(REG_CT_MODEL, code)) {
         setError(RB_ERR_IO);
@@ -700,13 +746,29 @@ bool RbAmp::setCTModel(uint8_t channel, uint8_t code) noexcept {
         return false;
     }
     delay(5);  /* per commands.yaml settle_ms */
-    return saveGains();
+    return saveUserConfig();  /* CT_MODEL is user_config — SAVE_GAINS is dev-gated (silent no-op in production) */
 }
 
 bool RbAmp::readCTModelCh(uint8_t channel, uint8_t& out) noexcept {
-    if (channel > 2) {
+    if (channel >= channels_) {
         setError(RB_ERR_PARAM);
         return false;
+    }
+    if (channel >= 3) {
+        /* Senior channels: the applied model lives in the window (field 15);
+         * the flat mirrors 0x51-0x53 only cover ch0-2. Re-select then read the
+         * low byte of the u32 window (model code). */
+        const uint8_t sel = static_cast<uint8_t>((v2::CHFIELD_CT_MODEL << 4) | (channel & 0x0F));
+        if (!writeReg(v2::REG_CHANNEL_SELECT, sel)) {
+            setError(RB_ERR_IO);
+            return false;
+        }
+        if (!readU8AB(v2::REG_CHANNEL_DATA, out)) {
+            if (lastError() == RB_OK) setError(RB_ERR_IO);
+            return false;
+        }
+        setError(RB_OK);
+        return true;
     }
     /* Mirror registers: CH0=0x51, CH1=0x52, CH2=0x53 (v2). A/B torn-read. */
     const uint8_t reg = static_cast<uint8_t>(v2::REG_CT_MODEL_CH0 + channel);
@@ -756,7 +818,7 @@ bool RbAmp::configureChannels(RbAmpSensorClass cls, const uint8_t* models, uint8
     for (uint8_t ch = 0; ch < n; ++ch) {
         const uint8_t code = models[ch];
         if (code == 0) continue;
-        if (code > 7 || !ctModelValid(cls, code)) {
+        if (!ctModelValid(cls, code)) {  /* known-code fast-fail (registry) */
             setError(RB_ERR_PARAM);
             return false;
         }
@@ -764,6 +826,34 @@ bool RbAmp::configureChannels(RbAmpSensorClass cls, const uint8_t* models, uint8
             setError(RB_ERR_VERSION);
             return false;
         }
+
+        if (ch >= 3) {
+            /* Senior channel: bind via the window (field 15) — no CMD opcode
+             * exists beyond ch2. Needs v1.4.18+ (fw ver 0x0A). Applies
+             * immediately; the single terminal SAVE below persists it. */
+            if (fw < 0x0A) {
+                setError(RB_ERR_VERSION);
+                return false;
+            }
+            if (!writeChannelModel(ch, code)) {
+                return false;  /* RB_ERR_IO already set */
+            }
+            delay(5);
+            /* Window bind is immediate + module-authoritative: a mismatch means
+             * the module rejected the (class,model) — re-writing would not help. */
+            if (verifyCtBind(ch, code) == RB_ERR_PARAM) {
+                setError(RB_ERR_PARAM);
+                if (log_) {
+                    log_->print(F("[rbamp] configureChannels: ch"));
+                    log_->print(ch);
+                    log_->println(F(" rejected (unknown model)"));
+                }
+                return false;
+            }
+            any_bound = true;
+            continue;
+        }
+
         if (!writeReg(REG_CT_MODEL, code)) {
             setError(RB_ERR_IO);
             return false;
@@ -800,7 +890,7 @@ bool RbAmp::configureChannels(RbAmpSensorClass cls, const uint8_t* models, uint8
 
     /* 3. ONE terminal SAVE for all binds (a UI3 = 2 flash cycles total, not 4). */
     if (any_bound) {
-        return saveGains();
+        return saveUserConfig();  /* CT_MODEL is user_config — SAVE_GAINS is dev-gated (silent no-op in production) */
     }
     setError(RB_OK);
     return true;

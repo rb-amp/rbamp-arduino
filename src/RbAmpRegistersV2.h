@@ -18,13 +18,13 @@
 namespace rbamp {
 namespace v2 {
 
-static constexpr uint32_t REG_SCHEMA_CRC32_V2 = 0x131F3839U;
+static constexpr uint32_t REG_SCHEMA_CRC32_V2 = 0x45274BE8U;
 static constexpr uint16_t PROTOCOL_VERSION_V2 = 0x0103U;  // 1.3 — (major<<8)|minor
 
 // ---- Register addresses + sizes ----
 static constexpr uint8_t REG_STATUS = 0x00;  // bit0=READY, bit1=ERROR, bit2=EVENTS_PENDING (v1.3: mirror of EVENT_FLAGS!=0)
 static constexpr uint8_t REG_COMMAND = 0x01;  // Write CMD_* opcode (commands.yaml)
-static constexpr uint8_t REG_ERROR = 0x02;  // 0x00=OK; 0xFA..0xFF error classes; ERR_CLONE added v1.3. Clear via CMD_CLEAR_ERROR (v1.3)
+static constexpr uint8_t REG_ERROR = 0x02;  // 0x00=OK; 0xFA..0xFF error classes; ERR_CLONE declared v1.3 but never raised (not implemented). Clear via CMD_C
 static constexpr uint8_t REG_VERSION = 0x03;  // 0x01=v1.0 .. 0x04=v1.3
 static constexpr uint8_t REG_MODE = 0x04;  // Device mode byte (read-only, factory use)
 static constexpr uint8_t REG_CT_MODEL = 0x05;  // CT model code; meaning is PER-CLASS (see SENSOR_CLASS 0x25). ACCEPTED (class,model) sets — codes without a CT_
@@ -47,9 +47,10 @@ static constexpr uint8_t REG_ADC_MEAN_I1_SIZE = 2;
 static constexpr uint8_t REG_ADC_MEAN_I2 = 0x16;  // Raw ADC mean of I2 (UI3/I3)
 static constexpr uint8_t REG_ADC_MEAN_I2_SIZE = 2;
 static constexpr uint8_t REG_CAPTURE_STATUS = 0x18;  // v1.3 raw-capture diag (major-carry glitch): bit0=ready. Arm via CMD_CAPTURE_RAW
-static constexpr uint8_t REG_CAPTURE_PAGE = 0x19;  // Page 0..7 — latches 32 raw I0 samples into CAPTURE_WINDOW
-static constexpr uint8_t REG_CAPTURE_WINDOW = 0x1A;  // 32×u16 LE raw pre-LUT I0 codes of selected page. Burst-read 64 bytes. 8 pages × 32 = 256 samples ~1.3 mains pe
-static constexpr uint8_t REG_CAPTURE_WINDOW_SIZE = 64;
+static constexpr uint8_t REG_CAPTURE_PAGE = 0x19;  // Page 0..15 — latches 16 raw I0 samples into CAPTURE_WINDOW
+static constexpr uint8_t REG_CAPTURE_WINDOW = 0x1A;  // 16×u16 LE raw pre-LUT I0 codes of selected page. Burst-read 32 bytes (sized to the 32-byte-max I2C bridge read
+static constexpr uint8_t REG_CAPTURE_WINDOW_SIZE = 32;
+static constexpr uint8_t REG_LUT_BYPASS = 0x1D;  // 1=bypass ADC-INL LUT (identity), 0=active. Diagnostic — LUT-on/off slope test
 static constexpr uint8_t REG_AC_FREQ = 0x20;  // 50 or 60
 static constexpr uint8_t REG_AC_PERIOD = 0x21;  // Mains half-period
 static constexpr uint8_t REG_AC_PERIOD_SIZE = 2;
@@ -68,6 +69,8 @@ static constexpr uint8_t REG_THRESH_P_HI = 0x2E;  // Power threshold → EVENT_F
 static constexpr uint8_t REG_THRESH_P_HI_SIZE = 2;
 static constexpr uint8_t REG_I2C_ADDRESS = 0x30;  // v1.3 two-phase: write candidate (0x08..0x77) -> RAM only (reads return staged value); arm ADDR_COMMIT_MAGIC th
 static constexpr uint8_t REG_ADDR_COMMIT_MAGIC = 0x31;  // Write 0xA5 to arm CMD_COMMIT_ADDR; consumed (cleared) on commit attempt. Write-only - reads return 0x00
+static constexpr uint8_t REG_LOCK_ARM_MAGIC = 0x33;  // v1.4.3 factory-only: write 0x5A to arm CMD_PRODUCTION_LOCK; consumed on attempt. Write-only - reads return 0x0
+static constexpr uint8_t REG_RDP_LEVEL = 0x34;  // v1.4.3: readback-protection level sampled from the option bytes at boot. 0=open, 1=RDP L1 (locked), 2=L2. Fact
 static constexpr uint8_t REG_CHANNEL_SELECT = 0x32;  // (field << 4) | channel. Writing snapshots the selected value into CHANNEL_DATA - RE-SELECT BEFORE EVERY READ (
 static constexpr uint8_t REG_CHANNEL_DATA = 0x3C;  // Four independent 1-byte registers 0x3C-0x3F (single-byte masters work). Read: float32 LE (u16 LE zero-padded f
 static constexpr uint8_t REG_CHANNEL_DATA_SIZE = 4;
@@ -187,6 +190,7 @@ static constexpr uint8_t CMD_UID_PRESENT = 0x35;
 static constexpr uint8_t CMD_UID_MUTE_RESET = 0x36;
 static constexpr uint8_t CMD_ENTER_BOOTLOADER = 0x37;
 static constexpr uint8_t CMD_CAPTURE_RAW = 0x38;
+static constexpr uint8_t CMD_PRODUCTION_LOCK = 0x39;
 static constexpr uint8_t CMD_FACTORY_RESET = 0xAA;
 
 // ---- Command settle times (ms) ----
@@ -214,6 +218,7 @@ static constexpr uint16_t SETTLE_MS_UID_PRESENT = 10;
 static constexpr uint16_t SETTLE_MS_UID_MUTE_RESET = 10;
 static constexpr uint16_t SETTLE_MS_ENTER_BOOTLOADER = 100;
 static constexpr uint16_t SETTLE_MS_CAPTURE_RAW = 80;
+static constexpr uint16_t SETTLE_MS_PRODUCTION_LOCK = 0;
 static constexpr uint16_t SETTLE_MS_FACTORY_RESET = 1500;
 
 // ---- Device error codes ----
@@ -274,6 +279,7 @@ static constexpr uint8_t CHFIELD_I_PEAK = 1;
 static constexpr uint8_t CHFIELD_P_REAL = 2;
 static constexpr uint8_t CHFIELD_PF = 3;
 static constexpr uint8_t CHFIELD_PERIOD_AVG_P = 13;
+static constexpr uint8_t CHFIELD_CT_MODEL = 15;
 
 // ---- Extended address space (0xFF-prefix, 16-bit) — reserved layout ----
 //   0x0100-0x011F: Bidirectional: PERIOD_AVG_P_NEG[3] f32, E_NEG accumulators (decision 5.3: F4 tiers only)

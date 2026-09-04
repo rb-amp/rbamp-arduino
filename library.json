@@ -1,6 +1,6 @@
 {
   "name": "RbAmp",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Arduino client library for the rbAmp I2C AC sensor / dimmer module. Reads RMS U / I / P / PF / frequency. Cross-platform naming consistent with STM32 HAL, ESP-IDF, MicroPython and CPython rbAmp libraries.",
   "keywords": "rbamp,i2c,energy,metering,ac,power-factor,dimmer,sensor,esphome,homeassistant",
   "authors": [

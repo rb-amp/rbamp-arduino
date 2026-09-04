@@ -349,8 +349,9 @@ public:
     /**
      * @brief Set the current-sensor family and persist to flash.
      *
-     * Writes REG_SENSOR_CLASS (0x25), issues CMD_SAVE_GAINS (0x26), waits 700 ms
-     * for flash erase to complete. Blocking.
+     * Writes REG_SENSOR_CLASS (0x25), issues CMD_SAVE_USER_CONFIG (0x32), waits
+     * 700 ms for flash erase to complete. Blocking. (SENSOR_CLASS is user_config;
+     * CMD_SAVE_GAINS is factory/develop-gated and a silent no-op in production.)
      *
      * On v1.2+ firmware this must be called BEFORE setCTModel() — otherwise
      * setCTModel() returns false with @c RB_ERR_PARAM. The chosen class also
@@ -368,8 +369,9 @@ public:
     /**
      * @brief Set the SCT-013 CT model on channel 0 (legacy single-arg form).
      *
-     * Writes REG_CT_MODEL (0x05), issues CMD_SAVE_GAINS (0x26), waits 700 ms
-     * for flash erase to complete. Blocking.
+     * Writes REG_CT_MODEL (0x05), binds channel 0, issues CMD_SAVE_USER_CONFIG
+     * (0x32), waits 700 ms for flash erase. Blocking. (CT_MODEL is user_config;
+     * CMD_SAVE_GAINS is factory/develop-gated and a silent no-op in production.)
      *
      * v1.2+ firmware precondition: setSensorClass() MUST be called first,
      * otherwise this method returns false with @c RB_ERR_PARAM and does not
@@ -380,19 +382,26 @@ public:
      * @c setCTModel(channel, code) instead — this single-arg form only
      * configures channel 0 (the device-side legacy direct-write path).
      *
-     * @param[in] code 1=SCT_013_005, 2=-010, 3=-030, 4=-050, 5=-100.
+     * @param[in] code CT-model code — use a generated @c RBAMP_CT_* define
+     *                 (RbAmpSensorModels.h), e.g. @c RBAMP_CT_SCT013_030 or
+     *                 @c RBAMP_CT_CLAMP2000_20A. The code's meaning is per-class;
+     *                 a code absent from the registry is rejected with
+     *                 @c RB_ERR_PARAM, and a code the module does not accept
+     *                 (reserved / uncharacterised) is surfaced as the device's
+     *                 @c RB_ERR_PARAM.
      * @return @c true on success.
      */
     bool setCTModel(uint8_t code) noexcept;
 
     /**
-     * @brief Typed-enum overload of @c setCTModel(uint8_t code).
+     * @brief Typed-enum overload of @c setCTModel(uint8_t code) — SCT-013 only.
      *
-     * Equivalent to @c setCTModel(static_cast<uint8_t>(model)). Prefer this
-     * form in user code for type safety and self-documenting call sites:
+     * Backward-compat convenience for the seven SCT-013 codes. As of v1.5.0 the
+     * canonical way to name a model — and the only way to name a WIRED_CT model
+     * — is the generated @c RBAMP_CT_* define:
      * @code
-     * dev.setCTModel(RbAmpCTModel::Sct013_030);    // ← clear
-     * dev.setCTModel(3);                            // ← legacy, still works
+     * dev.setCTModel(RBAMP_CT_SCT013_030);        // ← canonical (any class)
+     * dev.setCTModel(RbAmpCTModel::Sct013_030);   // ← legacy typed (SCT-013)
      * @endcode
      *
      * @param[in] model One of the @c RbAmpCTModel enumerators (Unset rejected
@@ -404,45 +413,51 @@ public:
     }
 
     /**
-     * @brief Set the SCT-013 CT model on a specific channel (v1.2+ firmware).
+     * @brief Set the CT model on a specific channel (v1.2+ firmware).
      *
-     * Sequence: writes @c REG_CT_MODEL, issues
-     * @c CMD_SET_CT_MODEL_CH0/CH1/CH2 (0x28/0x29/0x2A) per @p channel, waits
-     * 5 ms settle for the in-RAM preset-table lookup, then issues
-     * @c CMD_SAVE_GAINS for flash persistence (700 ms erase). Blocking ~705 ms
-     * per call.
+     * Channels 0-2 bind via @c CMD_SET_CT_MODEL_CH0/CH1/CH2 (0x28/0x29/0x2A);
+     * channels 3+ (senior SKUs UI5/UI7) bind via the channel window field 15
+     * (CT_MODEL), which requires v1.4.18+ firmware (fw ver 0x0A). Both paths end
+     * with @c CMD_SAVE_USER_CONFIG for flash persistence (700 ms erase; CT_MODEL
+     * is user_config — SAVE_GAINS is dev-gated); the ch3+ path
+     * additionally reads the applied model back and reports @c RB_ERR_PARAM if
+     * the module rejected the code (it keeps its previous model). Blocking
+     * ~705 ms per call.
      *
-     * @warning Multi-channel call order matters. Writing @c REG_CT_MODEL also
-     * triggers the device-side legacy direct-write callback which applies the
-     * preset to channel 0 unconditionally. So @c setCTModel(1, code) writes
-     * @c code's preset to channel 1 AS INTENDED, but also clobbers channel 0
-     * to the same preset as a side-effect. To configure all channels with
-     * different models, **call the higher channel indices FIRST**:
+     * @warning For channels 0-2, writing @c REG_CT_MODEL also triggers the
+     * device-side legacy direct-write callback which applies the preset to
+     * channel 0 unconditionally. So @c setCTModel(1, code) writes @c code to
+     * channel 1 AS INTENDED, but also clobbers channel 0 as a side-effect. To
+     * configure ch0-2 with different models, **call the higher channel indices
+     * FIRST**:
      * @code
-     * dev.setCTModel(2, 5);   // ch2 = SCT-013-100  (also clobbers ch0 → preset 5)
-     * dev.setCTModel(1, 3);   // ch1 = SCT-013-030  (also clobbers ch0 → preset 3)
-     * dev.setCTModel(0, 1);   // ch0 = SCT-013-005  (final ch0 preset)
+     * dev.setCTModel(2, RBAMP_CT_SCT013_020);  // ch2  (also clobbers ch0)
+     * dev.setCTModel(1, RBAMP_CT_SCT013_030);  // ch1  (also clobbers ch0)
+     * dev.setCTModel(0, RBAMP_CT_SCT013_005);  // ch0  (final ch0 preset)
      * @endcode
-     * Final state: ch0=preset 1, ch1=preset 3, ch2=preset 5. ✓
+     * Channels 3+ do NOT have this clobber side-effect (the window write targets
+     * exactly the selected channel). For a batched, order-safe configuration of
+     * all channels prefer @c configureChannels().
      *
-     * Requires @c firmwareVersion() >= 0x03 (v1.2). Returns @c RB_ERR_VERSION
-     * on older firmware. Same @c RB_ERR_PARAM guard as the single-arg form
-     * applies (sensor class must be set first).
+     * Requires @c firmwareVersion() >= 0x03 (v1.2); ch3+ requires >= 0x0A
+     * (v1.4.18). Returns @c RB_ERR_VERSION on older firmware. Same
+     * @c RB_ERR_PARAM guard as the single-arg form applies (sensor class must be
+     * set first, and the code must exist in the registry).
      *
-     * @param[in] channel 0..2.
-     * @param[in] code    1=SCT_013_005, 2=-010, 3=-030, 4=-050, 5=-100.
+     * @param[in] channel 0..channels()-1.
+     * @param[in] code    A generated @c RBAMP_CT_* code (see RbAmpSensorModels.h).
      * @return @c true on success.
      */
     bool setCTModel(uint8_t channel, uint8_t code) noexcept;
 
     /**
-     * @brief Typed-enum overload of @c setCTModel(channel, code).
+     * @brief Typed-enum overload of @c setCTModel(channel, code) — SCT-013 only.
      *
      * Equivalent to @c setCTModel(channel, static_cast<uint8_t>(model)).
-     * Same descending-order requirement applies; same @c RB_ERR_VERSION
-     * gate on firmware < v1.2.
+     * Same channel-order caveat and @c RB_ERR_VERSION gate apply. New code
+     * should pass a generated @c RBAMP_CT_* code to the @c uint8_t overload.
      *
-     * @param[in] channel 0..2.
+     * @param[in] channel 0..channels()-1.
      * @param[in] model   One of the @c RbAmpCTModel enumerators.
      * @return @c true on success.
      */
@@ -893,10 +908,12 @@ private:
     bool      readU8AB(uint8_t reg, uint8_t& out) noexcept;
     bool      readU16AB(uint8_t reg, uint16_t& out) noexcept;
 
-    /* Per-class CT-model accepted-set validation (A1). NON-contiguous, per the
-     * esp-idf reference _ct_model_valid: SCT013 {1,2,3,4,6}, WIRED_CT {1,2,3},
-     * BUILTIN_CT {} (codes 5/7 uncharacterised → reject). Firmware is the
-     * ultimate authority; this is a client-side fast-fail only. */
+    /* Known-code check against the generated registry (RbAmpSensorModels.h ←
+     * sensor_models.yaml). v1.5.0: replaced the hand-maintained per-class
+     * whitelist (which had drifted — WIRED_CT was missing entirely). A registry
+     * hit does NOT imply the module accepts the code — acceptance is runtime
+     * truth (module returns ERR_PARAM, channel keeps its previous model). This
+     * only fast-fails codes absent from the registry (typos). */
     static bool ctModelValid(RbAmpSensorClass cls, uint8_t code) noexcept;
 
     /* Post-bind mirror verify (configureChannels). Returns RB_OK if the applied
@@ -913,6 +930,15 @@ private:
      * then read the 0x3C..0x3F float32 snapshot. Re-selects on EVERY call
      * (contract rule #1 — the data buffer is the value at select time). */
     float     readChannelWindow(uint8_t ch, uint8_t field, float max_abs) noexcept;
+    /* Single ch<3/ch>=3 routing point for the contiguous RT metrics (I_RMS /
+     * I_PEAK / P_REAL / PF): ch0-2 read the flat block at flat_base+ch*4, ch3+
+     * read the channel window field. Keeps the routing decision in ONE place. */
+    float     readChannelMetric(uint8_t ch, uint8_t field,
+                                uint8_t flat_base, float max_abs) noexcept;
+    /* Per-channel CT model write via the window (field 15). Select + four
+     * single-byte data writes (LSB=code); no burst. Requires fw ver 0x0A.
+     * Caller validates channel and firmware version. */
+    bool      writeChannelModel(uint8_t ch, uint8_t code) noexcept;
     /* readAll folding: on a sanity-reject (RB_ERR_NON_PHYSICAL) set field=NaN +
      * flag the implausible bit and keep going; on transport failure return false. */
     bool      foldField(bool read_ok, float& field, uint8_t& mask, uint8_t bit) noexcept;

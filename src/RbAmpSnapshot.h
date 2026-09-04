@@ -17,6 +17,7 @@
 #define RBAMP_SNAPSHOT_H
 
 #include <stdint.h>
+#include "RbAmpSensorModels.h"  /* auto-generated CT-model registry (single source of truth) */
 
 /**
  * @brief Maximum current channels across all SKUs (UI7 / I7 = 7).
@@ -90,35 +91,37 @@ enum class RbAmpSensorClass : uint8_t {
 };
 
 /**
- * @brief Typed enumeration of SCT-013 models — replaces the magic-int
- *        @c code argument to setCTModel().
+ * @brief Typed convenience enumeration for the SCT-013 class (backward-compat).
  *
- * Both forms remain available:
- *  - @c setCTModel(uint8_t code) — legacy numeric form
- *  - @c setCTModel(RbAmpCTModel model) — typed form (recommended)
+ * @note As of v1.5.0 the CT-model list is generated from the registry
+ *       (@c libs/spec/sensor_models.yaml → @c RbAmpSensorModels.h). This enum
+ *       is a FROZEN backward-compat alias for the seven SCT-013 codes only; its
+ *       values are sourced from the generated @c RBAMP_CT_SCT013_* defines so
+ *       they cannot drift from the registry. New code — and every WIRED_CT
+ *       model — uses the generated @c RBAMP_CT_* defines directly with
+ *       @c setCTModel(uint8_t code) / @c setCTModel(channel, code).
  *
- * The numeric values match the wire-level @c REG_CT_MODEL SKU encoding so
- * the typed overload is a thin static_cast wrapper with no runtime cost.
+ * Both call forms remain available:
+ *  - @c setCTModel(uint8_t code) — numeric / generated-define form (canonical)
+ *  - @c setCTModel(RbAmpCTModel model) — typed form (SCT-013 only, legacy)
  *
- * @warning Per-class validation (A1): only a NON-contiguous subset of these
- *          SKUs is characterised for the @c Sct013 sensor class —
- *          @c {005, 010, 030, 050, 020}. @c Sct013_100 and @c Sct013_060 are
- *          recognised SKUs but UNCHARACTERISED (no bench calibration) and are
- *          rejected by setCTModel()/configureChannels() with @c RB_ERR_PARAM,
- *          and by the firmware with @c ERR_PARAM. The firmware is the ultimate
- *          authority; the library fast-fails before burning a flash cycle.
+ * @warning Model ACCEPTANCE is runtime truth: the client only checks that the
+ *          (class, code) pair exists in the registry, then the module decides.
+ *          An unknown or reserved code (e.g. Sct013_100 / Sct013_060) is
+ *          surfaced as @c RB_ERR_PARAM from the device — the channel keeps its
+ *          previous model. See @c rbamp_sensor_model_lookup().
  *
- * @see SPEC §10, truth-doc §7.
+ * @see SPEC §10, truth-doc §7, RbAmpSensorModels.h.
  */
 enum class RbAmpCTModel : uint8_t {
-    Unset       = 0,   /**< Default after factory reset; setCTModel() refused on v1.2+. */
-    Sct013_005  = 1,   /**< SCT-013-005A — 5 A clamp. (characterised) */
-    Sct013_010  = 2,   /**< SCT-013-010 — 10 A clamp. (characterised) */
-    Sct013_030  = 3,   /**< SCT-013-030 — 30 A clamp. (characterised) */
-    Sct013_050  = 4,   /**< SCT-013-050 — 50 A clamp. (characterised) */
-    Sct013_100  = 5,   /**< SCT-013-100 — 100 A clamp. UNCHARACTERISED → rejected. */
-    Sct013_020  = 6,   /**< SCT-013-020 — 20 A clamp. (characterised) */
-    Sct013_060  = 7,   /**< SCT-013-060 — 60 A clamp. UNCHARACTERISED → rejected. */
+    Unset       = RBAMP_SENSOR_CLASS_UNSET,  /**< 0 — default after factory reset. */
+    Sct013_005  = RBAMP_CT_SCT013_005,       /**< SCT-013-005A — 5 A clamp. */
+    Sct013_010  = RBAMP_CT_SCT013_010,       /**< SCT-013-010 — 10 A clamp. */
+    Sct013_030  = RBAMP_CT_SCT013_030,       /**< SCT-013-030 — 30 A clamp. */
+    Sct013_050  = RBAMP_CT_SCT013_050,       /**< SCT-013-050 — 50 A clamp. */
+    Sct013_100  = RBAMP_CT_SCT013_100,       /**< SCT-013-100 — 100 A. reserved → ERR_PARAM. */
+    Sct013_020  = RBAMP_CT_SCT013_020,       /**< SCT-013-020 — 20 A clamp. */
+    Sct013_060  = RBAMP_CT_SCT013_060,       /**< SCT-013-060 — 60 A. reserved → ERR_PARAM. */
 };
 
 /** @name Per-field implausible bits (RbAmpSnapshot::implausible). */
