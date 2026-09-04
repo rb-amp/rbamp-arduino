@@ -40,7 +40,7 @@ arduino-cli lib install RbAmp
 [env:esp32dev]
 platform   = espressif32
 framework  = arduino
-lib_deps   = rbamp/RbAmp@^1.0.0
+lib_deps   = rbamp/RbAmp@^1.5.0
 ```
 
 ## Step 2 — Wiring

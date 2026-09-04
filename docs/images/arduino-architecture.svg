@@ -50,7 +50,7 @@
   <rect x="394.0" y="1091.0" width="90.4" height="24" rx="12" ry="12" fill="#ADEFD1"/>
   <text x="439.2" y="1108.0" text-anchor="middle" font-family="'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" font-size="13" fill="#00203F">I²C  0x50</text>
   <rect x="45.0" y="1132.0" width="670.0" height="164.0" rx="16" ry="16" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5"/>
-  <text x="71.0" y="1179.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="21" fill="#00203F" font-weight="700">PY32-DimmerLink slave @ 0x50</tspan></text>
+  <text x="71.0" y="1179.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="21" fill="#00203F" font-weight="700">rbAmp module slave @ 0x50</tspan></text>
   <circle cx="74.0" cy="1211.0" r="2.5" fill="#00203F"/>
   <text x="87.0" y="1216.0" style="white-space:pre"><tspan font-family="system-ui,'Segoe UI',Inter,Helvetica,Arial,sans-serif" font-size="16" fill="#1a2030" font-weight="400">V03 metering pipeline (200 ms commit)</tspan></text>
   <circle cx="74.0" cy="1238.0" r="2.5" fill="#00203F"/>

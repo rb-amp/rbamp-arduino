@@ -1,10 +1,8 @@
 # RbAmp — Arduino library for rbAmp modules
 
-[![protocol: 1.2](https://img.shields.io/badge/protocol-1.2-blue)](docs/en/02_tiers.md)
-[![arduino: AVR · ESP32 · ESP8266 · STM32](https://img.shields.io/badge/arduino-AVR%20%C2%B7%20ESP32%20%C2%B7%20ESP8266%20%C2%B7%20STM32-brightgreen)](docs/en/04_hardware.md)
+[![protocol: 1.3](https://img.shields.io/badge/protocol-1.3-blue)](docs/02_tiers.md)
+[![arduino: AVR · ESP32 · ESP8266 · STM32](https://img.shields.io/badge/arduino-AVR%20%C2%B7%20ESP32%20%C2%B7%20ESP8266%20%C2%B7%20STM32-brightgreen)](docs/04_hardware.md)
 [![license: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
-
-> 🌐 [Русская версия / Russian version](README.ru.md)
 
 `RbAmp` is an Arduino library for **rbAmp** modules — compact hardware meters for AC current and voltage with an I²C interface. The module is built around a Cortex-M0+ microcontroller with an on-board isolated analog front-end and factory calibration.
 
@@ -45,7 +43,7 @@ The module connects to the master with four wires: `VCC`, `GND`, `SDA`, `SCL`. O
 | `SDA`, `SCL` | 3.3 V logic, **5 V-tolerant** — works with both 3.3 V masters (ESP32) and 5 V masters (Arduino UNO/Nano) |
 | `DRDY` | open-drain, 3.3 V level, ~10 µs LOW pulse every ~200 ms |
 
-The board has **built-in 4.7 kΩ pull-ups to 3.3 V** on SDA and SCL — a single-module setup needs no external pull-ups. On a multi-module bus, cut the `Pull-Up` jumper to disable them (see [04_hardware.md](docs/en/04_hardware.md)).
+The board has **built-in 4.7 kΩ pull-ups to 3.3 V** on SDA and SCL — a single-module setup needs no external pull-ups. On a multi-module bus, cut the `Pull-Up` jumper to disable them (see [04_hardware.md](docs/04_hardware.md)).
 
 The default I²C address is `0x50` (7-bit); the bus runs at 100 kHz (Standard mode) or 400 kHz (Fast mode).
 
@@ -67,7 +65,7 @@ arduino-cli lib install RbAmp
 [env:esp32dev]
 platform   = espressif32
 framework  = arduino
-lib_deps   = rbamp/RbAmp@^1.0.0
+lib_deps   = rbamp/RbAmp@^1.5.0
 ```
 
 ### Manual
@@ -103,7 +101,7 @@ What else:
 - **Current-sensor configuration** — `setSensorClass(class)` picks the family (SCT-013 / built-in CT / wired CT), then `setCTModel(code)` — or `configureChannels(class, models[], n)` for a multi-channel module in one call. The SCT-013 accepted code set is `{1=005A, 2=010A, 3=030A, 4=050A, 6=020A}`; `5=100A` and `7=060A` are recognised but uncharacterised and rejected. Calibration coefficients load automatically from the factory preset table.
 - **`RbAmpFleet` manager** — for several modules on one bus: `scan()` discovers and adopts them (with collision detection), `pollAll()` reads them in one pass, `totalPower()` / `totalEnergyWh()` aggregate, and the General-Call path (`enableGcAll()` → `gcLatch(tick)` → `checkSync()`) latches every module's period simultaneously with per-module missed-frame detection. `provision()` / `assignAddress()` bring factory-fresh modules onto the bus at distinct addresses.
 - **Identity & health** — `readVariant()`, `readCapability()`, `readUid()`, `readProductId()`, and a durable event/error channel (`hasError()`, `clearError()`).
-- **Per-channel Wh accumulator** — `dev.energy().wh(ch)` returns the current value accumulated by the library. Updated automatically after each successful `readPeriodSnapshot()`. Behaviour depends on the module's tier — see [02_tiers.md](docs/en/02_tiers.md).
+- **Per-channel Wh accumulator** — `dev.energy().wh(ch)` returns the current value accumulated by the library. Updated automatically after each successful `readPeriodSnapshot()`. Behaviour depends on the module's tier — see [02_tiers.md](docs/02_tiers.md).
 - **POD structures** `RbAmpSnapshot` / `RbAmpPeriodSnapshot` — every field of one snapshot in one struct. A field that fails the physical sanity filter is set `NaN` and flagged in `RbAmpSnapshot::implausible`, leaving the rest of the read usable.
 - **Protocol details hidden** — byte order, settle times after commands, NACK-retry (reads and writes), torn-read protection — all handled inside. User code calls methods rather than writing to registers.
 
@@ -113,17 +111,17 @@ What else:
 
 | Document | Purpose |
 |---|---|
-| [01 · Overview](docs/en/01_overview.md) | what rbAmp is, what the library does, comparison with raw-register access |
-| [02 · Module tiers](docs/en/02_tiers.md) | which tier (BASIC / STANDARD / PRO) fits which use case |
-| [03 · Current-sensor selection](docs/en/03_sensor_selection.md) | how to pick an SCT-013 (5A / 10A / 30A / 50A / 100A) and tell the module via `setCTModel()` |
-| [04 · Wiring](docs/en/04_hardware.md) | pinout, schematic for various Arduino hosts |
-| [05 · Quickstart](docs/en/05_quickstart.md) | first working sketch in 5 minutes |
-| [06 · Examples](docs/en/06_examples.md) | walkthrough of the sketches in `examples/` |
-| [07 · DIY integrations](docs/en/07_diy_integrations.md) | Home Assistant / Node-RED / OpenHAB |
-| [08 · Cloud integrations](docs/en/08_cloud_integrations.md) | AWS IoT / Azure / GCP / InfluxDB |
-| [09 · API reference](docs/en/09_api_reference.md) | full public library API |
-| [10 · Troubleshooting](docs/en/10_troubleshooting.md) | common problems and how to work through them |
-| [11 · Changelog](docs/en/11_changelog.md) | library release history |
+| [01 · Overview](docs/01_overview.md) | what rbAmp is, what the library does, comparison with raw-register access |
+| [02 · Module tiers](docs/02_tiers.md) | which tier (BASIC / STANDARD / PRO) fits which use case |
+| [03 · Current-sensor selection](docs/03_sensor_selection.md) | how to pick an SCT-013 (5A / 10A / 30A / 50A / 100A) and tell the module via `setCTModel()` |
+| [04 · Wiring](docs/04_hardware.md) | pinout, schematic for various Arduino hosts |
+| [05 · Quickstart](docs/05_quickstart.md) | first working sketch in 5 minutes |
+| [06 · Examples](docs/06_examples.md) | walkthrough of the sketches in `examples/` |
+| [07 · DIY integrations](docs/07_diy_integrations.md) | Home Assistant / Node-RED / OpenHAB |
+| [08 · Cloud integrations](docs/08_cloud_integrations.md) | AWS IoT / Azure / GCP / InfluxDB |
+| [09 · API reference](docs/09_api_reference.md) | full public library API |
+| [10 · Troubleshooting](docs/10_troubleshooting.md) | common problems and how to work through them |
+| [11 · Changelog](docs/11_changelog.md) | library release history |
 
 The wire-level protocol description (shared by all client libraries) lives in the [`rbamp-spec`](https://github.com/rb-amp/rbamp-spec) repository.
 
@@ -140,7 +138,7 @@ Ready sketches in [`examples/`](examples/):
 7. [`07_DeepSleepLogger`](examples/07_DeepSleepLogger/) — battery-powered deep-sleep logger
 8. [`08_FleetSync`](examples/08_FleetSync/) — scan a fleet, General-Call period sync, fleet-wide aggregation
 
-Each sketch is walked through in detail in [docs/en/06_examples.md](docs/en/06_examples.md). A bench-only validation harness lives in [`extras/`](extras/) (not a Library-Manager example).
+Each sketch is walked through in detail in [docs/06_examples.md](docs/06_examples.md). A bench-only validation harness lives in [`extras/`](extras/) (not a Library-Manager example).
 
 ## Compatibility
 

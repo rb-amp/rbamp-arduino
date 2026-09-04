@@ -44,7 +44,7 @@ a hand-maintained enum onto the generated registry. Firmware: v1.4.18 (fw ver
 ### Fixed
 - **CT model / sensor class now persist in production.** `setCTModel()`,
   `configureChannels()` and `setSensorClass()` persisted via `CMD_SAVE_GAINS`,
-  which is factory/develop-gated — on a production module the save was a silent
+  which is factory-gated — on a production module the save was a silent
   no-op, so the binding applied to RAM but was lost on the next reboot. These
   registers are `user_config`, so they now persist via `CMD_SAVE_USER_CONFIG`
   (ungated). No API change; same ~700 ms settle.
