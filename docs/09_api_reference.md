@@ -4,7 +4,11 @@
 
 ![Atomic period latch — one write closes the period and opens the next](images/period-atomic-latch.png)
 
-The complete public API of the `RbAmp` library v1.3.0 for Arduino. Source
+The public API of the `RbAmp` library for Arduino as of v1.3.0 (BASIC line).
+Everything added since — per-channel CT models (1.5.0), the STD line and the
+data-ready / event path (1.6.0), the SCT-013 rating correction and the
+sensor-config guard (1.6.1) — is documented in the header files and in
+[`CHANGELOG.md`](../CHANGELOG.md) until this chapter is extended. Source
 of truth — the header files [`src/RbAmp.h`](https://github.com/rb-amp/rbamp-arduino),
 [`src/RbAmpSnapshot.h`](https://github.com/rb-amp/rbamp-arduino),
 [`src/RbAmpEnergy.h`](https://github.com/rb-amp/rbamp-arduino),
@@ -522,8 +526,8 @@ Reads the module's `HW_VARIANT (0x55)` register. Values:
 | `5` | I2 | 2 | no |
 | `6` | I3 | 3 | no |
 
-Codes `2` (UI2) and `3` (UI3) are reserved for roadmap variants and
-do not occur on the current hardware. The method does no caching —
+Codes `2` (UI2) and `3` (UI3) identify the multi-channel voltage
+variants (1 U + 2 I, 1 U + 3 I). The method does no caching —
 it returns the "raw" byte; on v1.3 it is stable (read-only,
 ROM-stored).
 

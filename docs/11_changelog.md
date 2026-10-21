@@ -1,5 +1,60 @@
 # 11 · Changelog
 
+The full, detailed history is in [`CHANGELOG.md`](../CHANGELOG.md) at the
+repository root; this chapter keeps the short version.
+
+## 1.6.1 — STD micro-resolution energy, SCT-013 rating correction, sensor-config guard
+
+Released together with 1.6.0 as the first public release of the two-line
+library.
+
+- **STD line**: micro-resolution energy counters (µWh / µvarh), the starting
+  current for energy, voltage phase angle and phase sequence — for modules
+  whose image publishes them (capability bit 15); older modules behave exactly
+  as before.
+- **BASIC line**: SCT-013 rating correction — on firmware up to 1.4.19 a
+  channel switched to another SCT-013 model is read relative to the gain the
+  module applies (`sctRating()`, `sctRatingRefresh()`, `sctRatingScale()`);
+  firmware 1.4.20+ reports capability bit 12 and corrects itself. Sensor class
+  / CT model setters read before they write (`readSensorClass()`,
+  `setCTModelChForce()`, `sensorModel()` / `sensorModelRatedA()`); a stored
+  configuration can be re-applied on every boot without touching the
+  module's calibration.
+- **Both lines**: the measurement window / publish cadence is documented as
+  100 ms; the channel count can never exceed the snapshot arrays; host unit
+  tests run the real sources against a mock bus.
+
+## 1.6.0 — STD line (16-bit register model)
+
+One library, both product lines: `begin()` detects whether the module speaks
+the BASIC (8-bit) or the STD (16-bit, fixed-point) register model and routes
+every call internally — the method surface is the same on either line.
+
+- `line()`; unified readers on STD (`readVoltage(phase)`, Q / S); the STD block
+  API (`stdInfo()`, `stdReadChannel()`, `stdReadTotals()`, `stdReadEnergy()`,
+  `stdEnergyDelta()`, `stdReadConfig()`); latch banks (`stdArmBanks()`,
+  `stdLatch()`, `stdReadLatch()`); configuration and commands on STD;
+  firmware update over I²C (`stdOtaBegin()` … `stdOtaCommit()`, prepared
+  signed images).
+- Period source chosen from the module's capabilities (latch banks or
+  persisted counters); latch energy survives a module reset.
+- Data-ready line and events on both lines: `setDrdyPin()`, `waitDataReady()`,
+  `readAllReady()`, `readEventFlags()` / `clearEventFlags()`,
+  `setEventThresholds()`.
+- `11_StdLine` example. No BASIC API change.
+
+## 1.5.0 — Per-channel CT models + sensor-model registry
+
+- `setCTModel(channel, code)` / `configureChannels()` bind any channel,
+  including senior-SKU channels 3+ (through the channel window); every write
+  is confirmed by a read-back.
+- Generated sensor-model registry `RbAmpSensorModels.h` (`RBAMP_CT_*` defines,
+  descriptors, `rbamp_sensor_model_lookup()`); CT-model validation is
+  registry-driven.
+- CT model / sensor class now persist on production modules
+  (`CMD_SAVE_USER_CONFIG`).
+- `10_PerChannelModels` example.
+
 ## 1.4.0 — Senior-SKU support (UI5/UI7)
 
 Adds support for the 7-channel senior-SKU modules (UI5, UI7) and

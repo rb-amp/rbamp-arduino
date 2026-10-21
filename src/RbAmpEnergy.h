@@ -69,22 +69,41 @@ public:
     void tick(const RbAmpPeriodSnapshot& snap, uint8_t channels) noexcept;
 
     /**
-     * @brief Read the running total Wh for one channel.
+     * @brief Add a measured energy to one channel or to the all-channel total.
      *
-     * @param[in] ch Channel index 0..2. Out-of-range returns 0.
+     * Used by the STD counter path, where the module's own persisted counters
+     * give the period's energy directly (no P·dt integration). A no-op while
+     * disabled.
+     *
+     * @param[in] ch Channel index, or @c RBAMP_ENERGY_CH_TOTAL for the total.
+     * @param[in] wh Signed energy to add, Wh.
+     */
+    void addWh(uint8_t ch, double wh) noexcept;
+
+    /**
+     * @brief Read the running total Wh for one channel, or for all channels.
+     *
+     * @param[in] ch Channel index 0..RBAMP_MAX_CHANNELS-1, or
+     *               @c RBAMP_ENERGY_CH_TOTAL for the all-channel total (sum
+     *               of the per-channel feeds, or the module's grand counter
+     *               delta when the per-channel split is not published).
+     *               Other values return 0.
      * @return Running total energy in Wh. Signed: negative = net export.
+     * @note On an STD module without per-channel counters (counter path,
+     *       map < 0x36, more than one channel) RbAmp::energy() has no
+     *       per-channel figure: RbAmp::energyWh(ch) reports NaN there.
      */
     double wh(uint8_t ch = 0) const noexcept;
 
     /**
-     * @brief Reset one channel's accumulator to zero.
+     * @brief Reset one channel's accumulator (or the total) to zero.
      *
-     * @param[in] ch Channel index 0..2.
+     * @param[in] ch Channel index, or @c RBAMP_ENERGY_CH_TOTAL.
      */
     void reset(uint8_t ch = 0) noexcept;
 
     /**
-     * @brief Reset all channels' accumulators to zero.
+     * @brief Reset all channels' accumulators and the total to zero.
      */
     void resetAll() noexcept;
 
@@ -129,6 +148,7 @@ public:
 
 private:
     double   wh_[RBAMP_MAX_CHANNELS]; /**< Per-channel Wh accumulator. */
+    double   wh_total_;           /**< All-channel running total (signed). */
     bool     enabled_;            /**< Master switch for tick(). */
     uint32_t dropped_dt_count_;   /**< Diagnostic: tick() calls clamped on dt > 1 h. */
 };

@@ -72,7 +72,11 @@ void setup() {
   Serial.print(n);
   Serial.println(F(" current channel(s)."));
 
-  /* Sensor class first — CT models are per-class. */
+  /* Sensor class first — CT models are per-class. Safe to run on every boot:
+   * the library reads first, and a class or model the module already holds
+   * is not rewritten (no flash cycle, no calibration loss). A module that
+   * ships calibrated with its own sensor (class WiredCT / BuiltinCT) refuses
+   * reconfiguration with RB_ERR_MODE. */
   if (!dev.setSensorClass(RbAmpSensorClass::Sct013)) {
     Serial.print(F("setSensorClass failed: "));
     Serial.println(RbAmp::errorString(dev.lastError()));

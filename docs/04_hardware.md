@@ -469,7 +469,7 @@ In this configuration:
    To 3.3 V — never a problem.
 ```
 
-## Multi-phase model roadmap
+## Multi-phase models
 
 For future multi-phase SKUs the LV pinout is **preserved** (VCC / GND
 / SDA / SCL / DRDY). Only the mains side changes — more L terminals and

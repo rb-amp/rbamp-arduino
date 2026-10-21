@@ -181,8 +181,8 @@ If something doesn't add up, see [10_troubleshooting.md](10_troubleshooting.md).
 | SKU | I channels | U channel | Typical use |
 |---|---|---|---|
 | **UI1** | 1 | yes | A single load with **full power computation** (P, PF, Q, Wh) — a typical mains meter |
-| UI2 | 2 | yes | **Roadmap** (deferred) — two independent loads on one phase with per-channel power |
-| UI3 | 3 | yes | **Roadmap** — not buildable on the current MCU package (a 4th ADC channel is needed) |
+| **UI2** | 2 | yes | Two independent loads on one phase with **per-channel power** |
+| **UI3** | 3 | yes | 1 U + 3 I — three loads on one phase with **per-channel power** (P, PF, Q, Wh) |
 | **I1** | 1 | no | Sub-meter without power computation (**current only**) — when a separate UI1 handles mains metering |
 | **I2** | 2 | no | Two-channel current sub-meter — per-circuit breakdown |
 | **I3** | 3 | no | Three-channel current sub-meter — per-circuit breakdown / dual-CT topology |
@@ -262,11 +262,11 @@ U channel**, so P / PF / Q computation on the module side is not
 possible — they provide **per-channel current** (I_rms, I_peak on each
 channel) and nothing more.
 
-UI2 and UI3 (with a U channel + multi-channel power) are listed on the
-roadmap but **are not buildable on the current MCU package** (UI3 needs
-a 4th ADC channel; UI2 is deferred). Use I2/I3 as current sub-meters
-paired with a separate **UI1** at the service entrance, which provides
-mains-energy + voltage.
+**UI2** (1 U + 2 I) and **UI3** (1 U + 3 I) add the voltage channel to
+the same multi-channel layout, so per-channel power is computed on the
+module itself. When module-side power is not needed, use I2/I3 as
+current sub-meters paired with a separate **UI1** at the service
+entrance, which provides mains-energy + voltage.
 
 ### Reading channels (I2 / I3)
 

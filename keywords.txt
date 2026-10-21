@@ -18,6 +18,14 @@ RbAmpCTModel	KEYWORD1
 RbAmpFleet	KEYWORD1
 RbAmpFleetSync	KEYWORD1
 RbAmpFleetPoll	KEYWORD1
+RbAmpLine	KEYWORD1
+RbAmpStdInfo	KEYWORD1
+RbAmpStdChannel	KEYWORD1
+RbAmpStdVoltage	KEYWORD1
+RbAmpStdHealth	KEYWORD1
+RbAmpStdLatch	KEYWORD1
+RbAmpStdConfig	KEYWORD1
+RbAmpOtaProgress	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -47,9 +55,40 @@ readPeriodLatchMs	KEYWORD2
 readPeriodSnapshot	KEYWORD2
 energy	KEYWORD2
 setSensorClass	KEYWORD2
+readSensorClass	KEYWORD2
+setCTModelChForce	KEYWORD2
+sensorModel	KEYWORD2
+sensorModelRatedA	KEYWORD2
 setCTModel	KEYWORD2
 configureChannels	KEYWORD2
 readCTModelCh	KEYWORD2
+line	KEYWORD2
+readReactivePower	KEYWORD2
+readApparentPower	KEYWORD2
+stdInfo	KEYWORD2
+stdReadChannel	KEYWORD2
+stdReadTotals	KEYWORD2
+stdReadVoltage	KEYWORD2
+stdReadHealth	KEYWORD2
+stdArmBanks	KEYWORD2
+stdLatch	KEYWORD2
+stdReadLatch	KEYWORD2
+stdLatchWh	KEYWORD2
+stdReadConfig	KEYWORD2
+stdSetHarmonics	KEYWORD2
+stdCalThdFloor	KEYWORD2
+stdOtaStatus	KEYWORD2
+stdOtaBegin	KEYWORD2
+stdOtaWritePage	KEYWORD2
+stdOtaCommit	KEYWORD2
+stdOtaActivate	KEYWORD2
+stdOtaWriteImage	KEYWORD2
+stdCrc32	KEYWORD2
+stdOtaWritePreparedImage	KEYWORD2
+stdOtaActiveBank	KEYWORD2
+stdOtaStagedVersion	KEYWORD2
+stdOtaDiag	KEYWORD2
+stdOtaAbort	KEYWORD2
 saveGains	KEYWORD2
 saveUserConfig	KEYWORD2
 prepareAddressChange	KEYWORD2
@@ -154,3 +193,58 @@ SETTLE_MS_LATCH_PERIOD	LITERAL1
 SETTLE_MS_SAVE_GAINS	LITERAL1
 SETTLE_MS_RESET	LITERAL1
 SETTLE_MS_FACTORY_RESET	LITERAL1
+
+# STD map 0x36 / DRDY (1.6.0)
+RbAmpStdPeriodSource	KEYWORD1
+RbAmpStdEnergy	KEYWORD1
+RbAmpStdIdentity	KEYWORD1
+RbAmpStdHistPeriod	KEYWORD1
+RbAmpStdHistInfo	KEYWORD1
+RbAmpStdHistRecord	KEYWORD1
+RbAmpStdEvent	KEYWORD1
+RbAmpDrdyEvent	KEYWORD1
+energyWh	KEYWORD2
+addWh	KEYWORD2
+setDrdyPin	KEYWORD2
+waitDataReady	KEYWORD2
+readAllReady	KEYWORD2
+readDataSeq	KEYWORD2
+beginEventFlags	KEYWORD2
+readEventMask	KEYWORD2
+setEventMask	KEYWORD2
+setEventThresholds	KEYWORD2
+stdReadEnergy	KEYWORD2
+stdEnergyDelta	KEYWORD2
+stdIdentify	KEYWORD2
+stdProbe	KEYWORD2
+stdReadImageVersion	KEYWORD2
+stdReadBoardId	KEYWORD2
+stdOtaBoardOk	KEYWORD2
+stdSetTime	KEYWORD2
+stdReadTime	KEYWORD2
+stdCommand	KEYWORD2
+stdWaitIdle	KEYWORD2
+stdLocate	KEYWORD2
+stdSetAddressByUid	KEYWORD2
+stdHistInfo	KEYWORD2
+stdHistRead	KEYWORD2
+stdHistReadRaw	KEYWORD2
+stdEventRead	KEYWORD2
+stdHistFlush	KEYWORD2
+RBAMP_ENERGY_CH_TOTAL	LITERAL1
+RBAMP_DRDY_POLL_MS	LITERAL1
+RBAMP_STD_HIST_PHASES	LITERAL1
+
+# STD micro-resolution energy / starting current / angles (1.6.1)
+RbAmpStdPhaseSeq	KEYWORD1
+stdReadPhaseSequence	KEYWORD2
+stdSetEnergyStartCurrent	KEYWORD2
+stdReadEnergyStartCurrent	KEYWORD2
+
+# SCT-013 rating correction (1.6.1)
+RbAmpSctRating	KEYWORD1
+RbAmpSctRatingStatus	KEYWORD1
+sctRatingRefresh	KEYWORD2
+sctRating	KEYWORD2
+sctRatingScale	KEYWORD2
+sctPresetGain	KEYWORD2

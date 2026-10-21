@@ -24,7 +24,7 @@
  *          stored in RTC slow-RAM (@c rtc_last_wake_us) which survives deep
  *          sleep. A future v1.3+ @c warmBegin() that skips the primer will
  *          let this pattern use default @c readPeriodSnapshot() instead —
- *          see 06_examples.md Sc9 roadmap callout.
+ *          see 06_examples.md, Scenario 9.
  *
  * Note: deep sleep resets WiFi state; for MQTT publishing combine with
  *       example 4 (replace the publish_serial() stub).

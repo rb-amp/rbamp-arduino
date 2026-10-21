@@ -5,7 +5,8 @@
  * Demonstrates how to split incoming (consume) vs outgoing (export) energy
  * from one rbAmp channel. The device reports SIGNED real power; the library
  * accumulator sums it as-is. To separate the two flows we sample real power
- * at the RT cadence (200 ms) and integrate consume/export buckets manually.
+ * at the RT cadence (100 ms measurement window) and integrate consume/export
+ * buckets manually.
  *
  * The library's built-in energy accumulator (dev.energy().wh(0)) yields the
  * NET balance. This sketch keeps two additional double-precision counters
@@ -36,8 +37,10 @@ void setup() {
 }
 
 void loop() {
-    /* Sample RT real power every 200 ms — matches device's commit cadence */
-    if (millis() - last_sample_ms < 200) {
+    /* Sample RT real power every 100 ms — matches the device's measurement
+     * window (images before v1.2 published every 200 ms; sampling at 100 ms
+     * simply reads some windows twice there). */
+    if (millis() - last_sample_ms < 100) {
         delay(5);
         return;
     }

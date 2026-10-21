@@ -16,14 +16,15 @@ data (in particular — export to the grid).
 
 ## Current status
 
-In the current rbAmp firmware, only the **BASIC** tier is implemented
-and shipping. STANDARD and PRO are on the roadmap and not implemented.
+The **BASIC** tier and the **STANDARD** line are shipping; this library
+supports both (STANDARD from library 1.6.0, see the README). PRO is not
+implemented.
 
 | Tier | Shipping |
 |---|---|
 | **BASIC** | ✅ yes |
-| **STANDARD** | ❌ planned |
-| **PRO** | ❌ planned |
+| **STANDARD** | ✅ yes (library 1.6.0+) |
+| **PRO** | ❌ not implemented |
 
 ## BASIC — entry tier for consumer metering
 
@@ -72,8 +73,7 @@ uint32_t t_prev_ms = millis();
 void loop() {
     // Sample RT power at 5 Hz — matches the firmware-commit cadence
     // (200 ms per channel). Faster gives empty repeat reads; slower
-    // loses resolution on abrupt load transitions. ±2 % accuracy is
-    // achievable for typical mixed loads with an inverter.
+    // loses resolution on abrupt load transitions.
     //
     // delay() blocks the loop — incompatible with concurrent work
     // (LCD refresh, MQTT, networking). For sketches with other tasks,
