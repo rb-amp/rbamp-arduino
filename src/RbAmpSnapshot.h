@@ -173,7 +173,7 @@ struct RbAmpSctRating {
  *
  * @warning Model ACCEPTANCE is runtime truth: the client only checks that the
  *          (class, code) pair exists in the registry, then the module decides.
- *          An unknown or reserved code (e.g. Sct013_100 / Sct013_060) is
+ *          An unknown or unsupported code is
  *          surfaced as @c RB_ERR_PARAM from the device — the channel keeps its
  *          previous model. See @c rbamp_sensor_model_lookup().
  *
@@ -185,9 +185,9 @@ enum class RbAmpCTModel : uint8_t {
     Sct013_010  = RBAMP_CT_SCT013_010,       /**< SCT-013-010 — 10 A clamp. */
     Sct013_030  = RBAMP_CT_SCT013_030,       /**< SCT-013-030 — 30 A clamp. */
     Sct013_050  = RBAMP_CT_SCT013_050,       /**< SCT-013-050 — 50 A clamp. */
-    Sct013_100  = RBAMP_CT_SCT013_100,       /**< SCT-013-100 — 100 A. reserved → ERR_PARAM. */
+    Sct013_100  = RBAMP_CT_SCT013_100,       /**< SCT-013-100 — 100 A clamp. */
     Sct013_020  = RBAMP_CT_SCT013_020,       /**< SCT-013-020 — 20 A clamp. */
-    Sct013_060  = RBAMP_CT_SCT013_060,       /**< SCT-013-060 — 60 A. reserved → ERR_PARAM. */
+    Sct013_060  = RBAMP_CT_SCT013_060,       /**< SCT-013-060 — 60 A clamp. */
 };
 
 /** @name Per-field implausible bits (RbAmpSnapshot::implausible). */
@@ -419,7 +419,7 @@ struct RbAmpStdLatch {
  * @brief Life-time energy counters of an STD module (RbAmp::stdReadEnergy()).
  *
  * Persisted on the module (survive power loss), monotonic, signed import /
- * export split; the grand block is the billing register. A period's energy is
+ * export split; the grand block is the energy register. A period's energy is
  * the difference of two readings (RbAmp::stdEnergyDelta()). Below map 0x36
  * the mWh fields and the per-channel arrays are 0 (whole-Wh totals only).
  *

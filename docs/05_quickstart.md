@@ -16,7 +16,7 @@ SCT-013 by range) live in the neighboring chapters:
 
 - An rbAmp module (any tier, UI1 for simplicity)
 - An Arduino-compatible host — UNO / Mega / ESP32 / ESP8266 / STM32duino / RP2040
-- An SCT-013 clamp rated for your maximum current (5A / 10A / 30A / 50A / 100A)
+- An SCT-013 clamp rated above your largest expected current (5A / 10A / 30A / 50A / 100A) — or the CT that came attached to your module
 - A 5 V supply to power the module (from the host's USB-5V or external)
 - An AC circuit to measure (a lamp, a kettle, a household appliance)
 
@@ -40,12 +40,14 @@ arduino-cli lib install RbAmp
 [env:esp32dev]
 platform   = espressif32
 framework  = arduino
-lib_deps   = rbamp/RbAmp@^1.5.0
+lib_deps   = rbamp/RbAmp@^1.6.1
 ```
 
 ## Step 2 — Wiring
 
-Four wires plus an optional DRDY:
+> ⚠ **Mains voltage can kill.** Disconnect and lock out the circuit before connecting the L/N terminals or fitting the clamp; have a qualified person do mains wiring and any work inside a panel. Clamp ONE conductor only (L) — never the whole cable (L+N cancel to ~0). Fuse the L tap per local rules.
+
+Four low-voltage wires plus an optional DRDY, then the mains terminals:
 
 | rbAmp pin | Host |
 |---|---|
@@ -53,7 +55,9 @@ Four wires plus an optional DRDY:
 | `GND` | GND |
 | `SDA` | I²C SDA (UNO A4, ESP32 GPIO21, STM32duino PB7) |
 | `SCL` | I²C SCL (UNO A5, ESP32 GPIO22, STM32duino PB6) |
-| `DRDY` (optional) | any input-capable GPIO; **a 10 kΩ pull-up to 3.3 V is mandatory**, see [04_hardware.md](04_hardware.md#data_ready-drdy) |
+| `DRDY` (optional) | skip it for the first sketch; see [04_hardware.md](04_hardware.md#data_ready-drdy) |
+| `L`, `N` terminals | the same circuit that feeds the load you measure (mains side — see the warning above) |
+| CT jack | SCT-013 plug pushed fully in |
 
 Power **must be 5 V**. The I²C lines run on 3.3 V logic but are 5 V
 tolerant — connect them directly to an Arduino UNO with no level
@@ -63,7 +67,7 @@ resistors — for a single module no external ones are needed.
 The full pinout table for each Arduino host is in
 [04 · Wiring](04_hardware.md).
 
-The SCT-013 clamp snaps around the **line conductor (L)**, with the
+The SCT-013 clamp snaps around the **line conductor (L) only**, with the
 arrow on the clamp body pointing **in the direction of current toward
 the load**. For more detail (the "Current sensor" section) see chapter
 [04 · Wiring](04_hardware.md).
@@ -95,7 +99,7 @@ void setup() {
 
     // v1.3: auto-detect the variant via REG_HW_VARIANT — more accurate than
     // the constructor topology hint (which is now a fallback for legacy fw).
-    uint8_t variant = dev.readVariant();
+    uint8_t variant = static_cast<uint8_t>(dev.readVariant());
     Serial.print(F("Module ready, variant="));
     Serial.println(variant);   // 1=UI1, 4=I1, 5=I2, 6=I3
 }
@@ -114,10 +118,12 @@ Upload the sketch and open the Serial Monitor at **115200 baud**.
 Expected output (with no sensor calibration):
 
 ```text
-Module ready.
-U=230.4V  I=0.000A  P=0.0W  PF=---
-U=230.4V  I=0.000A  P=0.0W  PF=---
+Module ready, variant=1
+U=230.4V  I=0.000A  P=0.0W  PF=nan
+U=230.4V  I=0.000A  P=0.0W  PF=nan
 ```
+
+`PF` may print `nan`, `0.000` or another placeholder while the current is zero.
 
 > `U` shows roughly the mains voltage (220-240 V on 230 V networks) —
 > which means the module is connected correctly. `I=0.000 A` even with
@@ -129,9 +135,16 @@ U=230.4V  I=0.000A  P=0.0W  PF=---
 
 ## Step 4 — Current Sensor Configuration
 
-On firmware v1.3 you **must** tell the module the sensor class and
-model. Without that the calibration coefficients are not loaded and the
-current readings stay at zero.
+If you fitted a separate **SCT-013 clip-on clamp**, you **must** tell the
+module the sensor class and model. Without that the calibration
+coefficients are not loaded and the current readings stay at zero. If your
+module came with its CT already attached, skip this step.
+
+Read the model off the label printed on the clamp (for example
+`SCT-013-030` → code 3, see the table below). Choose the smallest rated
+clamp above your largest expected current. A clamp rated too small gives
+clipped, too-low readings at peaks; one rated far too large gives noisy,
+inaccurate readings at small currents.
 
 Add this to `setup()` after `dev.begin()`. **The `loop()` function
 stays the same as in Step 3** — only `setup()` changes:
@@ -147,7 +160,7 @@ void setup() {
 
     while (!dev.begin()) { delay(500); }
 
-    // Step 1: sensor class. The current rbAmp SKU is SCT-013.
+    // Step 1: sensor class. SCT-013 = the clip-on clamp you fitted.
     if (!dev.setSensorClass(RbAmpSensorClass::Sct013)) {
         Serial.print(F("setSensorClass failed: "));
         Serial.println(dev.errorString());
@@ -165,7 +178,7 @@ void setup() {
 }
 ```
 
-Model codes — the production-safe (characterized) set is `{1, 2, 3, 4, 6}`:
+Model codes — the accepted set is `{1, 2, 3, 4, 5, 6, 7}`:
 
 | `code` | Model | Range | Status | Typical use |
 |:---:|---|---|:---:|---|
@@ -173,8 +186,9 @@ Model codes — the production-safe (characterized) set is `{1, 2, 3, 4, 6}`:
 | 2 | SCT-013-010 | 0..10 A | ✅ selectable | Refrigerator, washing machine |
 | 3 | SCT-013-030 | 0..30 A | ✅ selectable | Household feed up to ~7 kW |
 | 4 | SCT-013-050 | 0..50 A | ✅ selectable | EV charger, electric heating |
+| 5 | SCT-013-100 | 0..100 A | ✅ selectable | Main service entrance, large feeds |
 | 6 | SCT-013-020 | 0..20 A | ✅ selectable | Medium feed — 3-4 kW appliances |
-| 5 | SCT-013-100 | 0..100 A | ⏳ reserved | Reserved — requires bench validation, rejected by the library |
+| 7 | SCT-013-060 | 0..60 A | ✅ selectable | Industrial sub-meter |
 
 For more on selection see [03 · Current Sensor Selection](03_sensor_selection.md).
 
@@ -223,7 +237,7 @@ void setup() {
     while (!dev.begin()) { delay(500); }
     dev.setSensorClass(RbAmpSensorClass::Sct013);
     dev.setCTModel(RbAmpCTModel::Sct013_030);
-    Serial.println(F("Period meter started; first snapshot in ~60 s..."));
+    Serial.println(F("Period meter started; the first line covers only the time since begin() — ignore it..."));
 }
 
 void loop() {
@@ -241,8 +255,8 @@ void loop() {
     Serial.println(F(" ms"));
 
     delay(60000);  // the 60-second period sits at the END of loop — the first
-                   // snapshot is taken right after setup(), so the user sees
-                   // output within seconds rather than after 60 s of silence
+                   // snapshot is taken right after setup() and covers only the
+                   // seconds since begin(); full periods follow
 }
 ```
 
@@ -260,79 +274,26 @@ What `readPeriodSnapshot()` does under the hood:
 3. Checks the ready flag; reads the average/peak power.
 4. Updates the internal Wh counter: `+= avg_p × master_dt_s / 3600`.
 
-The first call after `begin()` is a primer: the module returns whatever
-it accumulated since power-on (an interval unsuitable for tariff
-accounting). The library knows on its own to discard this snapshot —
-user code never sees it.
+`begin()` already performs a first latch that the library discards. The
+first `readPeriodSnapshot()` in your sketch therefore covers only the
+time since `begin()` (a few seconds, see `dt=` in the output): ignore that
+first line and wait for a full period. From the second call on, each line
+covers one full period.
 
 Expected output:
 
 ```text
-avg P for period: 120.18 W   accumulated: 2.0036 Wh   dt=60012 ms
-avg P for period: 120.21 W   accumulated: 4.0073 Wh   dt=60005 ms
+avg P for period: 119.90 W   accumulated: 0.1332 Wh   dt=4000 ms    <- short first period, ignore
+avg P for period: 120.18 W   accumulated: 2.1368 Wh   dt=60012 ms
+avg P for period: 120.21 W   accumulated: 4.1405 Wh   dt=60005 ms
 ...
 ```
 
-## Step 6 — Quickstart for a Fleet of N Modules
+## Several modules
 
-This quickstart shows working with a **single** module. The library's
-real canonical scenario is **several** modules on one bus under a single
-`RbAmpFleet` handle (mains + N sub-loads). The full example is in
-chapter [06 · Examples](06_examples.md), scenario 1 "Mains + N sub-loads
-— the 80% canon". A minimal fleet skeleton:
-
-```cpp
-#include <Wire.h>
-#include <RbAmp.h>
-#include <RbAmpFleet.h>
-
-RbAmpFleet fleet(Wire);
-
-void setup() {
-    Serial.begin(115200);
-    while (!Serial && millis() < 3000) { /* USB-CDC */ }
-
-    Wire.begin();
-#if defined(ESP32) || defined(ESP8266)
-    Wire.setClock(50000);
-#endif
-
-    size_t added = 0;
-    if (!fleet.scan(/*match_product=*/true, added)) {
-        Serial.println(F("fleet scan failed — bus wedged?"));
-        return;
-    }
-    Serial.print(F("fleet: ")); Serial.print((unsigned)added);
-    Serial.print(F(" modules; excluded="));
-    Serial.println((unsigned)fleet.excludedCount());
-}
-
-RbAmpSnapshot snaps[RBAMP_FLEET_MAX_MODULES];
-RbAmpFleetPoll status[RBAMP_FLEET_MAX_MODULES];
-
-void loop() {
-    size_t n_ok = 0;
-    fleet.pollAll(snaps, status, RBAMP_FLEET_MAX_MODULES, n_ok);
-
-    float p_total = 0.0f;
-    fleet.totalPower(p_total);
-
-    Serial.print(F("fleet: "));
-    Serial.print((unsigned)n_ok); Serial.print(F("/"));
-    Serial.print((unsigned)fleet.count());
-    Serial.print(F(" OK, total P = "));
-    Serial.print(p_total, 1);
-    Serial.println(F(" W"));
-
-    delay(200);
-}
-```
-
-In the canonical 80% scenario one of the modules is a `UI1` on the mains
-feed (it provides `totalPower` and `totalEnergyWh`), while the rest —
-`I2`/`I3` — are current sub-meters. The details and the extended
-scenarios (mains+sub-loads disaggregation, GC sync for billing-grade
-snapshots, the provisioning workflow) are in chapter 06.
+For several modules on one bus (mains feed + sub-loads) use `RbAmpFleet`.
+The full example is in [06 · Examples](06_examples.md), scenario 1; wiring
+rules for a multi-module bus are in [04 · Wiring](04_hardware.md).
 
 ## What's Next
 

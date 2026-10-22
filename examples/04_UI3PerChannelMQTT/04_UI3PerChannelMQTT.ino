@@ -83,7 +83,7 @@ void setup() {
     Serial.begin(115200);
     delay(200);
     Wire.begin();
-    Wire.setClock(50000);   /* SPEC §B.5 dense-workload baseline; matches SoakMonitor + 06_examples.md Sc4 */
+    Wire.setClock(50000);   /* dense-workload baseline; see 06_examples.md */
     dev.setLogStream(&Serial);
 
     while (!dev.begin()) {

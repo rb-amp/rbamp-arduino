@@ -5,7 +5,9 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 
-`RbAmp` is an Arduino library for **rbAmp** modules — compact hardware meters for AC current and voltage with an I²C interface. The module is built around a Cortex-M0+ microcontroller with an on-board isolated analog front-end and factory calibration.
+`RbAmp` is an Arduino library for **rbAmp** modules — compact hardware meters for AC current and voltage with an I²C interface. The module has an on-board isolated analog front-end and factory calibration.
+
+> **Mains voltage can kill.** Disconnect and lock out the circuit before connecting the L/N terminals or fitting the clamp; have a qualified person do mains wiring and any work inside a panel. Clamp ONE conductor only (L) — never the whole cable (L+N cancel to ~0). Fuse the L tap per local rules.
 
 From an integrator's point of view, rbAmp behaves like any other I²C slave device: power it up, read registers, get values in physical units (volts, amperes, watts). No signal processing on the master side is required.
 
@@ -46,7 +48,7 @@ The module connects to the master with four wires: `VCC`, `GND`, `SDA`, `SCL`. O
 
 The board has **built-in 4.7 kΩ pull-ups to 3.3 V** on SDA and SCL — a single-module setup needs no external pull-ups. On a multi-module bus, cut the `Pull-Up` jumper to disable them (see [04_hardware.md](docs/04_hardware.md)).
 
-The default I²C address is `0x50` (7-bit); the bus runs at 100 kHz (Standard mode) or 400 kHz (Fast mode).
+The default I²C address is `0x50` (7-bit). Bus speed: UNO / Mega / STM32 / RP2040 100 kHz; ESP32 / ESP8266 50 kHz. Do not use 400 kHz.
 
 ## Installation
 
@@ -94,19 +96,27 @@ The module returns **only instantaneous and period-averaged quantities** — vol
 E_Wh += PERIOD_AVG_P_W × master_dt_seconds / 3600
 ```
 
-That gives every module in the system the same time base (see [04_period_metering.md](https://github.com/rb-amp/rbamp-spec/blob/main/docs/04_period_metering.md) in the canonical spec), with no need to reconcile internal clocks across devices. The library integrates against the **master's wall-clock**, never the chip's diagnostic period timer (which under-counts ~25-30 % under load); on a missed/stale period the integration anchor is held so the next valid window is not under-counted.
+That gives every module in the system the same time base (see [04_period_metering.md](https://github.com/rb-amp/rbamp-spec/blob/main/docs/04_period_metering.md) in the canonical spec), with no need to reconcile internal clocks across devices. The library integrates against the **master's wall-clock**, never the module's diagnostic period timer; on a missed/stale period the integration anchor is held so the next valid window is not under-counted.
 
 What else:
 
-- **`RbAmp` class** — one instance per module on the bus. Named methods for every quantity: `readVoltage()`, `readPower(ch)`, `readPowerFactor(ch)`, `readFrequency()`, `readPeriodSnapshot(&snap)`, `setSensorClass(class)`, `setCTModel(code)`, and so on.
-- **Current-sensor configuration** — `setSensorClass(class)` picks the family (SCT-013 fitted by you; wired / built-in CT modules ship calibrated with their sensor and are not reconfigured), then `setCTModel(code)` — or `configureChannels(class, models[], n)` for a multi-channel module in one call. The setters read before they write: a class or model the module already holds costs no bus write and no flash cycle, so re-applying a stored configuration on every boot is safe. The SCT-013 accepted code set is `{1=005A, 2=010A, 3=030A, 4=050A, 6=020A}`; `5=100A` and `7=060A` are recognised but uncharacterised and rejected. Calibration coefficients load automatically from the factory preset table. BASIC modules up to firmware 1.4.19 are calibrated on the SCT-013-030: when you select another SCT-013 model the library restarts the module after the save and from then on scales current and power readings relative to the gain the module applies (see `sctRating()`); power factor and voltage are not affected, and a module that reports the self-correction capability bit (firmware 1.4.20+) needs none.
-- **`RbAmpFleet` manager** — for several modules on one bus: `scan()` discovers and adopts them (with collision detection), `pollAll()` reads them in one pass, `totalPower()` / `totalEnergyWh()` aggregate, and the General-Call path (`enableGcAll()` → `gcLatch(tick)` → `checkSync()`) latches every module's period simultaneously with per-module missed-frame detection. `provision()` / `assignAddress()` bring factory-fresh modules onto the bus at distinct addresses.
-- **Identity & health** — `readVariant()`, `readCapability()`, `readUid()`, `readProductId()`, and a durable event/error channel (`hasError()`, `clearError()`).
-- **Per-channel Wh accumulator** — `dev.energy().wh(ch)` returns the current value accumulated by the library. Updated automatically after each successful `readPeriodSnapshot()`. Behaviour depends on the module's tier — see [02_tiers.md](docs/02_tiers.md).
-- **POD structures** `RbAmpSnapshot` / `RbAmpPeriodSnapshot` — every field of one snapshot in one struct. A field that fails the physical sanity filter is set `NaN` and flagged in `RbAmpSnapshot::implausible`, leaving the rest of the read usable.
-- **Both product lines, one API** — `begin()` detects whether a module speaks the BASIC (8-bit) or the STD (16-bit, fixed-point) register model and routes every call internally; `line()` tells you which. On an STD module the same `readVoltage(phase)` / `readCurrent(ch)` / `readPower(ch)` / `readPeriodSnapshot()` calls work, channel counts come from the module (three-phase modules are just N > 1), and the STD-only extras are exposed as `readReactivePower(ch)` / `readApparentPower(ch)`, `stdReadChannel(ch)` (one burst: I / P / Q / S / PF / peak / signed energy / harmonics), `stdReadVoltage(v)`, `stdReadHealth()`, and eight master-timed latch banks (`stdArmBanks()` → `stdLatch(bank)` → `stdReadLatch(bank)` → `stdLatchWh()`). Modules that keep persisted life-time counters instead of latch banks are served by the same `readPeriodSnapshot()` / `energy()` calls (a period is the difference of two counter readings; `stdReadEnergy()` gives the raw counters), plus the module clock (`stdSetTime()`), history and event log (`stdHistRead()`, `stdEventRead()`), identity (`stdIdentify()`, `RbAmp::stdProbe()`), commissioning by UID (`RbAmp::stdSetAddressByUid()`) and firmware update over I2C (`stdOtaWritePreparedImage()`, images prepared on the manufacturer's build host). Every command waits for the module to report it finished before the verdict is read, and multi-byte blocks are read in one transaction so counters never tear. Modules that publish micro-resolution counters fill the `*_uwh` / `*_uvarh` fields of `RbAmpStdEnergy` (`fine == true`; derived from the coarse counters elsewhere, so the fields are always usable), accept a starting current below which a channel counts no energy (`stdSetEnergyStartCurrent()`), and report voltage phase angles (`angle_deg` in `stdReadVoltage()`) and the phase sequence (`stdReadPhaseSequence()`). If your sketch persists `RbAmpStdEnergy` (NVS, EEPROM, file), store the individual fields you need in your own fixed format, not the struct as a raw blob — the structure gains fields across library versions and an old blob will not match the new size.
-- **Data-ready line and events** — `setDrdyPin(pin)` listens to the module's DRDY output; `waitDataReady()` / `readAllReady()` return right after the module publishes a new snapshot (several modules may share one line), and a module holding the line signals a masked event (`setEventMask()`, `setEventThresholds()`) that the wait reads and clears for you. Without a line the same calls poll.
-- **Protocol details hidden** — byte order, settle times after commands, NACK-retry (reads and writes), torn-read protection — all handled inside. User code calls methods rather than writing to registers.
+- **Read values** — `readVoltage()`, `readCurrent(ch)`, `readPower(ch)`, `readPowerFactor(ch)`, `readFrequency()`, or everything at once with `readAll(snap)`. A value that fails a plausibility check comes back as `NaN`; the rest of the read stays usable.
+- **Energy** — `readPeriodSnapshot(snap)` once per period, then `dev.energy().wh(ch)` gives the Wh total kept by the library.
+- **Several modules** — `RbAmpFleet` scans the bus, polls every module in one call and adds up the totals (see [06 · Examples](docs/06_examples.md)).
+- **STANDARD (STD) modules** — the same calls work; `begin()` detects the module line, and the extra STD calls are listed in [02 · Module tiers](docs/02_tiers.md) and [09 · API reference](docs/09_api_reference.md#std-line-api).
+- **Everything else** — sensor setup, DRDY line, identity, error handling: [09 · API reference](docs/09_api_reference.md).
+
+**Words used in these docs**
+
+| Word | Meaning |
+|---|---|
+| Period | The time between two energy readings that you take (for example 60 s). |
+| Latch | A command that makes the module freeze its running average for the period so you can read it. |
+| Window | One 100 ms measurement slot of the module; real-time values refresh once per window. |
+| BASIC / STD | The two module lines. Check the label on your module; `dev.line()` prints it after `begin()`. |
+| DRDY | Optional "data ready" output pin; it pulses LOW when fresh values are published. |
+| Image version | The version of the module's internal firmware image, read with `stdReadImageVersion()` (STD modules only). |
+
 
 > **Robustness on a multi-module / marginal bus (ESP32).** Arduino-ESP32's `Wire` wraps a driver that can block on a held bus *below* the library, which a software timeout cannot interrupt. Use proper external **~4.7 kΩ pull-ups**, keep a debugger/NRST off the bus in production, and arm an **app-level task watchdog** on your polling task as the recovery path. This is the same three-layer posture validated in extended soak on the bench.
 
@@ -115,7 +125,7 @@ What else:
 | Document | Purpose |
 |---|---|
 | [01 · Overview](docs/01_overview.md) | what rbAmp is, what the library does, comparison with raw-register access |
-| [02 · Module tiers](docs/02_tiers.md) | which tier (BASIC / STANDARD / PRO) fits which use case |
+| [02 · Module tiers](docs/02_tiers.md) | which module line (BASIC / STANDARD (STD)) fits which use case |
 | [03 · Current-sensor selection](docs/03_sensor_selection.md) | how to pick an SCT-013 (5A / 10A / 30A / 50A / 100A) and tell the module via `setCTModel()` |
 | [04 · Wiring](docs/04_hardware.md) | pinout, schematic for various Arduino hosts |
 | [05 · Quickstart](docs/05_quickstart.md) | first working sketch in 5 minutes |
@@ -157,7 +167,7 @@ The library works with module firmware **v1.0..v1.3**:
 | v1.2 | `0x03` | `REG_SENSOR_CLASS` (0x25) |
 | **v1.3** | **`0x04`** | `REG_HW_VARIANT` / `REG_CAPABILITY` / UID, per-channel CT, General-Call fleet sync, two-phase address commit, event channel |
 
-**STD line modules** (the 16-bit register model, map version `0x30` and later) are supported from library **1.6.0**: `begin()` detects the line automatically, so the same sketch serves both lines. Firmware update over I2C needs map `0x33+`; synchronous command verdicts need `0x34+` (on older STD maps a rejected write is not reported). Micro-resolution energy, the starting current, voltage angles and the phase sequence (library 1.6.1) need an image that publishes them (`stdReadImageVersion()` ≥ `0x0001007B`; capability bit 15) — on older images the library reports them as derived / not available.
+**STD line modules** (the 16-bit register model, map version `0x30` and later) are supported from library **1.6.0**: `begin()` detects the line automatically, so the same sketch serves both lines. Firmware update over I2C needs map `0x33+`; synchronous command verdicts need `0x34+` (on older STD maps a rejected write is not reported). Micro-resolution energy, the starting current, voltage angles and the phase sequence (library 1.6.1) need an image that publishes them (`stdReadImageVersion()` ≥ `0x0001007B`) — on older images the library reports them as derived / not available.
 
 All library versions work with all firmware versions. Registers absent on an older firmware return `0x00` for byte reads and `0.0f` for float reads — the library falls back accordingly (e.g. on pre-v1.3 firmware `REG_HW_VARIANT` reads `0x00` and variant detection uses the constructor topology hint). The fleet General-Call sync requires v1.3 firmware; on older firmware fall back to per-device sequential `latchPeriod()` (see `03_MultiModuleBroadcast`).
 

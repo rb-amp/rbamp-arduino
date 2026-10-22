@@ -14,22 +14,22 @@ the two-line library. In short:
 
 - **STD line**: micro-resolution energy counters (µWh / µvarh), the
   starting current for energy, voltage phase angle and phase sequence — for
-  modules whose image publishes them (capability bit 15, images 0x7A / 0x7B);
+  modules whose image publishes them (capability flag, images 0x7A / 0x7B);
   older modules behave exactly as before.
 - **BASIC line**: SCT-013 rating correction — on firmware up to 1.4.19 a
   channel switched to another SCT-013 model is read relative to the gain the
-  module applies; firmware 1.4.20+ reports capability bit 12
-  (`CAP_SCT_RATING_SELF`) and corrects itself. Sensor class / CT model
+  module applies; firmware 1.4.20+ corrects itself (detected by a capability flag). Sensor class / CT model
   setters read before they write (a stored configuration can be re-applied on
   every boot without touching the module's calibration); factory-paired
   classes are refused.
+- SCT-013-060 and -100 are accepted (they were refused client-side as reserved); sensor-model clip limits updated to measured values.
 - **Both lines**: the measurement window / publish cadence is documented as
   100 ms; the channel count can never exceed the snapshot arrays; a host unit
   test suite (`extras/host_tests`) runs the real sources against a mock bus.
 
 ### Added
 - **SCT-013 rating correction** (BASIC firmware 1.2 .. 1.4.19, sensor class
-  SCT-013; libs/spec/SCT_RATING_SWITCH.md). Those modules are calibrated on the
+  SCT-013). Those modules are calibrated on the
   SCT-013-030 and after a restart apply that calibrated gain whatever model a
   channel shows. `begin()` now reads each channel's model, applied gain and
   noise floor and scales `readCurrent()` / `readCurrentPeak()` / `readPower()`
@@ -45,8 +45,8 @@ the two-line library. In short:
   model / applied_gain / noise_floor / scale / status), `sctRatingScale(ch)`,
   `sctPresetGain(model)`. `readEventFlags()` re-reads the correction once per
   `EVENT_RESET_OCCURRED` (re-armed by `clearEventFlags()`). A module that
-  reports CAPABILITY bit 12 (`CAP_SCT_RATING_SELF`, firmware 1.4.20+)
-  corrects itself (scale 1, plain model write; the VERSION byte is not the
+  corrects itself (firmware 1.4.20+, detected by a capability flag)
+  gets scale 1 (plain model write; the VERSION byte is not the
   gate), STD modules and the wired / built-in CT classes are never scaled. Host test `extras/host_tests/sct_rating_test.cpp` (124
   checks, negative control with the formula removed).
 - **µWh / µvarh counters** in `RbAmpStdEnergy`: `act_import_uwh` /
@@ -178,7 +178,7 @@ plan).
   bank 0 (armed by `begin()`); the settle is raised to ≥ 300 ms there because
   the module services a latch at its next measurement-window boundary. On STD
   `latch_ms` is 0 (the module has no clock) and `master_dt_ms` is the period.
-- `RbAmpVariant::U3I3` / `U3I6`; `readVariant()`, `readUid()`,
+- `readVariant()`, `readUid()`,
   `readLastError()`, `reset()`, `probe()`, `waitReady()` and
   `firmwareVersion()` route on STD. `readProductId()` reports the sensor family
   on an STD instance so a product-matched fleet scan adopts STD modules.
@@ -299,8 +299,8 @@ plan).
   with life-time counters (the module does not keep them there; energy is
   `stdReadEnergy()`).
 - OTA rejection reason 15 is named (BOARD) in the log; the generated register
-  header follows the spec (STATUS bit 3 is reserved; the Modbus function /
-  alias leaves that the firmware does not implement are gone).
+  header matches the module (STATUS bit 3 is reserved; names for functions the
+  module does not implement are removed).
 
 ### Fixed
 - **Latch energy no longer freezes after a module reset (STD).** The latch
@@ -342,8 +342,7 @@ a hand-maintained enum onto the generated registry. Firmware: v1.4.18 (fw ver
   is surfaced as `RB_ERR_PARAM` and the channel keeps its previous model.
 - **`readCTModelCh()` covers all channels** — channels 3+ read the applied model
   from the window; the flat mirrors `0x51-0x53` still serve ch0-2.
-- **Generated sensor-model registry** — `RbAmpSensorModels.h` (generated from
-  `libs/spec/sensor_models.yaml`): `RBAMP_CT_*` code defines for both classes
+- **Generated sensor-model registry** — `RbAmpSensorModels.h` (generated): `RBAMP_CT_*` code defines for both classes
   (SCT-013 + WIRED_CT 1..13), human descriptors, per-model status, and
   `rbamp_sensor_model_lookup()`. Use the `RBAMP_CT_*` defines to name a model.
 - `10_PerChannelModels` example.
@@ -432,11 +431,10 @@ ground-truth (38/38 full-coverage suite, plus an extended app-WDT soak).
 
 ### Changed
 - **Energy** integrates over the master's wall-clock, never the chip's
-  diagnostic `latch_ms` (the chip timer under-counts ~25-30%). On a stale period
+  diagnostic `latch_ms` (a module diagnostic timer, not for energy). On a stale period
   the integration anchor is held so the next valid window is not under-counted.
 - **CT model** codes follow the v1.3 per-class accepted set — `Sct013` accepts
-  `{005, 010, 030, 050, 020}`; `SCT-013-100` and `-060` are recognised SKUs but
-  uncharacterised and rejected client-side. `REG_CT_MODEL` is pure staging:
+  `{005, 010, 030, 050, 100, 020, 060}`. `REG_CT_MODEL` is pure staging:
   binding is via the per-channel command, so multi-channel binds are
   order-independent and never clobber channel 0.
 - **Address change** is a production-OK two-phase magic commit — no factory mode

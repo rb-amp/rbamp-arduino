@@ -28,7 +28,7 @@
 static const uint8_t  SDA_PIN   = 21;
 static const uint8_t  SCL_PIN   = 22;
 static const uint8_t  GC_GROUP  = 0x00;     // all-call
-static const uint32_t WINDOW_MS = 60000UL;  // 60 s billing window
+static const uint32_t WINDOW_MS = 60000UL;  // 60 s energy window
 
 RbAmpFleet fleet(Wire);
 size_t     g_count = 0;

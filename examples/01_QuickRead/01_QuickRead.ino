@@ -6,7 +6,7 @@
  *   rbAmp SDA -> GPIO21
  *   rbAmp SCL -> GPIO22
  *   rbAmp GND -> GND
- *   rbAmp 3V3 -> 3V3 (or 5V if the module has on-board regulator)
+ *   rbAmp VCC -> 5V (the module must be powered from 5 V)
  *
  * Works on AVR (Uno/Mega), ESP32, ESP8266 and STM32duino out of the box.
  * Adjust @c SDA / @c SCL pin macros if your board needs explicit pins.
@@ -28,7 +28,7 @@ void setup() {
     Serial.println(F("rbAmp — Example 1: QuickRead"));
 
     Wire.begin();
-    /* Optional: Wire.setClock(400000); // bus is happy at 400 kHz */
+    /* Bus speed: UNO/Mega/STM32/RP2040 100 kHz; ESP32/ESP8266 50 kHz (Wire.setClock(50000)). Do not use 400 kHz. */
 
     dev.setLogStream(&Serial);  /* prints variant-detect + errors */
 

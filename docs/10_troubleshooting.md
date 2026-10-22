@@ -21,6 +21,8 @@ Shortcut for the impatient: the `dev.retryExhaustionCount()` and
 they aren't, jump straight to the "Module doesn't respond over I²C"
 section below.
 
+**Check first:** `U=0` → L/N not connected or breaker off; `I=0` → CT jack not fully inserted (or no CT model set, see below).
+
 ## Module doesn't respond over I²C
 
 **What you observe:** `dev.begin()` returns `false` with
@@ -147,8 +149,8 @@ current.
 2. **Check that the CT model matches the load.** A large CT clamp (for
    example, SCT-013-100, 100 A) on a small load (a 50 W lamp = ~0.2 A)
    produces a signal right at the noise floor and the readings will be
-   zero. Choose the **smallest** CT model that covers your maximum
-   expected current. The full table is in
+   zero. Choose the smallest rated clamp above your largest expected
+   current. The full table is in
    [03 · Current sensor selection](03_sensor_selection.md).
 
    If you have a multi-channel module (UI2 / UI3) and you want to see
@@ -165,22 +167,20 @@ current.
    is "backwards", `readCurrent()` will give the correct magnitude, but
    `readPower()` will give a negative value on a consuming load. The
    confirmation — `readPowerFactor()` will show exactly −1.0 on a
-   resistive load (instead of +1.0). The fix: either physically
-   reinstall the clamp (unclip it, turn the arrow the right way,
-   clip it back), or invert the sign on the master side.
+   resistive load (instead of +1.0). The fix: physically
+   reinstall the clamp (with the circuit disconnected: unclip it, turn the
+   arrow the right way, clip it back). Do not invert the sign in software.
 
 ### If all three steps pass and the current is still zero
 
-Then the signal at the ADC really is below the noise floor. Check:
+Then the signal at the module input really is below the noise floor. Check:
 
 - **Whether current is actually flowing** — measure it with a
   multimeter (DC clamp / AC clamp meter) on the same wire.
 - **Whether the clamp is intact** — there should be an AC voltage at
   the clamp connector proportional to the current (a few millivolts
   for consumer loads).
-- **Whether you're clamping the right wire** — the line, not the
-  neutral (although a clamp on the neutral will work too — it measures
-  current amplitude, not direction).
+- **Whether you're clamping the right wire** — one conductor only, the line (L); never the whole cable.
 
 ## Readings jump around or come back as NaN
 
@@ -251,9 +251,8 @@ PF.
 ### PF is exactly −1.0 on a purely consuming load
 
 The clamp is installed "backwards" — the arrow does not point in the
-direction of current toward the load. The fix: either reinstall the
-clamp correctly, or handle the sign on the master side
-(`p = -p; pf = -pf;` if you know the load can't be a PV inverter).
+direction of current toward the load. The fix: reinstall the
+clamp correctly (physically flip it; do not invert the sign in software).
 
 ### PF floats between +0.3 and +0.7 on a resistive load
 
@@ -321,12 +320,15 @@ reference meter (Kill-A-Watt and the like).
    interval between the previous and the next latch is lost. Enable the
    RTC for such scenarios.
 
-### Accumulator accuracy by platform
+### Accumulator precision by platform
 
-| Platform | Accumulator type | Long-term accuracy |
-|---|---|---|
-| ESP32 / ESP8266 / STM32duino / SAMD / RP2040 | 64-bit `double` | drift < 1 LSB / year @ 60 s cadence |
-| Arduino AVR (Uno, Mega, Nano) | 32-bit `float` (toolchain) | ~0.01 % drift per day |
+| Platform | Accumulator type |
+|---|---|
+| ESP32 / ESP8266 / STM32duino / SAMD / RP2040 | 64-bit `double` |
+| Arduino AVR (Uno, Mega, Nano) | 32-bit `float` (toolchain) |
+
+Master-side integration adds no error of its own beyond the module's
+active-power accuracy.
 
 For AVR on long soak installations, periodically reset the accumulator
 and save the long-term total to your own persistent store:
@@ -337,32 +339,10 @@ mqtt.publish("rbamp/wh_daily", String(dev.energy().wh(0)));
 dev.energy().reset(0);
 ```
 
-### `snap.latch_ms` reads ~27% short of the real period — this is EXPECTED, not a bug
+### `snap.latch_ms` differs from the real period
 
-**What you observe:** if, for your own diagnostics, you divide
-`snap.latch_ms` (the chip-side software timer) by the real wall-clock
-time between two `readPeriodSnapshot()` calls, the ratio comes out at
-**~0.73** (that is, the chip-side timer undercounts by ~27%).
-
-**This is by design and HW-validated** (bench measurements across all
-4 sister-libs: esp-idf 0.7396, arduino 0.729, python 0.743 — all
-converge in the 26-27% window). The cause is SysTick starvation on the
-slave: under load, DMA/ISR leave too little cycle budget for regular
-incrementing of the software timer. `latch_ms` (register `0xEC`) is
-intended **only as a diagnostic indicator** of slave activity, **NOT
-for billing**.
-
-> **Canon**: `dev.energy().wh(ch)` integrates over the **master
-> `millis()`** (the master's wall-clock), not over `snap.latch_ms`.
-> The Arduino library's Wh accounting is **accurate** — bench measure:
-> relative error vs independent ground-truth = **0.0000%** (lib
-> integration math `avg_p × master_dt / 3600000` exact). All 4
-> sister-libs (arduino, esp-idf, python, esphome) use the same canon.
-
-If your code relies on `snap.latch_ms` for some sub-period
-computations, switch to your own `millis()`. If you just see the
-discrepancy in the logs and are worried — it's normal; remove the
-discrepancy from your diagnostics or accept the 27% gap as expected.
+`latch_ms` is a module diagnostic timer; do not use it for energy — use the
+master clock (`master_dt_ms`).
 
 ### `RB_ERR_STALE` on every read — the master automatically holds the anchor
 
@@ -532,18 +512,73 @@ Possible causes:
    [03 · Current sensor selection](03_sensor_selection.md) and
    [09 · API reference § Sensor configuration](09_api_reference.md).
 2. **Invalid model code** — for the `Sct013` class the valid set is
-   `{1, 2, 3, 4, 6}` (non-contiguous; code 5 is reserved in v1.3
-   firmware, the former SCT-013-100). For other classes, see the
+   `{1, 2, 3, 4, 5, 6, 7}` (codes 5 and 7 are SCT-013-100 and
+   SCT-013-060). For other classes, see the
    per-class accept-set table in
-   [03 · Current sensor selection](03_sensor_selection.md#per-class-ct-validation).
+   [03 · Current sensor selection](03_sensor_selection.md#choosing-an-sct-013-model).
    Codes that don't match the class return `RB_ERR_PARAM` (lib-side
    pre-bus guard) or `DEV_ERR_PARAM` (firmware-side, if YAML slips past).
 3. **Invalid channel index** in the per-channel form
-   `setCTModel(channel, code)` — it must be < `dev.channels()`.
+   `setCTModel(channel, code)` — it must be < `dev.channels()`. A channel
+   at or beyond `RBAMP_MAX_CHANNELS` (7) is never exposed and also returns
+   `RB_ERR_PARAM`.
+4. **The module rejected the code** — a code that is in the registry but that
+   the module does not accept is
+   refused by the module; the channel keeps its previous model.
+
+If the call returns `false` with `RB_ERR_MODE` instead, the module is of a
+factory-paired class (`WiredCT` / `BuiltinCT`) — it was shipped and calibrated
+together with its sensor and the setters do not rewrite it. Re-pairing in
+service is `setCTModelChForce()`.
+
+**Expected behaviour, not a fault:**
+
+- Setting a class or model the module already holds is a no-op (`true`, no
+  bus write, no flash cycle).
+- Setting a CT model **restarts the module** on BASIC firmware up to 1.4.19
+  with the SCT-013 class (about a second, blocking). Readings are unavailable
+  during that time; the library re-reads the rating correction afterwards.
+- After switching an SCT-013 model the current, power and energy readings
+  follow the new rating automatically (power factor and voltage are not
+  affected). `dev.sctRating(ch, r)` shows the status per channel; if it
+  reports `UnexpectedGain` or `Unknown`, no correction is applied (scale 1).
+
+## STD (STANDARD) module notes
+
+The STD line uses the **same I²C wiring** as BASIC (see
+[04 · Wiring](04_hardware.md)); `dev.begin()` detects it and `dev.line()`
+tells you which line you have. Things specific to STD:
+
+- **`RB_ERR_NOT_IMPLEMENTED`** from a `std*` call, `readReactivePower()` or
+  `readApparentPower()` — the connected module is BASIC (check
+  `dev.line()`). Conversely, BASIC-only calls (`factoryReset()`,
+  General-Call, label helpers, `readCapability()`, `readCommitSeq()`) return
+  it on an STD module.
+- **A feature reports "not available"** — micro-resolution energy
+  (`RbAmpStdEnergy::fine == false`), the starting current for energy
+  (`RB_ERR_NOT_IMPLEMENTED`), voltage phase angles (`angle_valid == false`)
+  and the phase sequence (`NotAvailable`) depend on the module's **image
+  version**: they need an image of at least `0x0001007B`. Read it with
+  `dev.stdReadImageVersion()`; on an older image the value is not available,
+  not wrong.
+- **Voltage angle / phase sequence stay "not available" on a recent image** —
+  they need all voltage inputs energised and measurable, and a three-voltage
+  module for the phase sequence.
+- **Period snapshots/latch reads come back empty (`RB_ERR_STALE`) after a
+  module restart** — expected: the latch arm lives in the module's RAM. The
+  library re-arms the bank and drops that one period; restart your own `dt`
+  anchor. Wait at least 300 ms between `stdLatch()` and `stdReadLatch()`.
+- **No history records** — the module records history only while its clock is
+  set. The clock is lost at every module restart: call `dev.stdSetTime()` after
+  `begin()` and whenever `stdReadHealth()` reports `time_valid == false`.
+- **A command returns `RB_ERR_PARAM`** — on STD every command's verdict is
+  read back; the module rejected the value and is unchanged.
+- **A save returns `RB_ERR_NOT_READY`** — the module limits how often it
+  writes its store; the library already retries once after 5 s.
 
 ## Error handling: `REG_ERROR` last-write + `EVENT_FLAGS.bit3` durable (v1.3)
 
-**v1.3 canon (HW-confirmed)**: `REG_ERROR (0x02)` is
+**v1.3 behaviour**: `REG_ERROR (0x02)` is
 **last-write-outcome**, and **NOT sticky**. On each register write the
 firmware sets `reg_error = ERR_OK`; a subsequent unrelated write
 **clears** the previous error.
@@ -571,8 +606,7 @@ if (event_flags & (1 << 3)) {
 }
 ```
 
-> ⚠ **REVERSAL** of the previous "sticky" documentation (v1.3 A3 root
-> canon). REG_ERROR is last-write-outcome, not sticky. Durability is
+> ⚠ REG_ERROR is last-write-outcome, not sticky. Durability is
 > provided by EVENT bit3.
 
 > ⚠ **bit3 is an async channel, not for synchronous write validation**:
@@ -645,7 +679,7 @@ the main source of the window expiring. `dev.probe()` won't help here
 call `commitAddressChange()`.
 
 > ✅ **`REG_I2C_ADDRESS (0x30)` now reads the ACTIVE address at boot**
-> (v1.3 Fix 4 addr-boot-sync). After a post-commit reboot, reading 0x30
+> (v1.3). After a post-commit reboot, reading 0x30
 > will show the new active address. For the most reliable verification
 > of a two-phase address commit, try a read at the new address (it
 > should ACK on the bus). After a host-write (staging), the register
@@ -664,7 +698,7 @@ periodically return `NAN`, `lastError() == RB_ERR_NACK` or
 relay/inductive load on the same setup. Steady-state reads are
 reliable.
 
-**Cause (C.12 HW-confirmed root 2026-06-15):** during relay switching
+**Cause:** during relay switching
 (a 5 A load) EMI fails ~67% of I²C transactions (~8/12 in the hw
 measurement). The bus self-recovers, **no wedge occurs**, no module is
 lost — but the current read fails.
@@ -699,14 +733,14 @@ call. `RbAmp::errorString(code)` returns a human-readable string.
 | `RB_OK` (0) | "OK" | success | — |
 | `RB_ERR_IO` (-1) | "I2C transport failure" | the bus driver returned non-OK | wiring, power, pull-ups |
 | `RB_ERR_NACK` (-2) | "NACK — device absent or busy" | retry exhausted | "Module doesn't respond over I²C" section |
-| `RB_ERR_TIMEOUT` (-3) | "Bus timeout" | the `waitReady` / `commitAddressChange` window expired | "commitAddressChange() returns RB_ERR_TIMEOUT" section |
-| `RB_ERR_NOT_READY` (-4) | "Device not ready" | (reserved) | — |
+| `RB_ERR_TIMEOUT` (-3) | "Bus timeout" | the `waitReady` / `waitDataReady` / `commitAddressChange` window expired | "commitAddressChange() returns RB_ERR_TIMEOUT" section |
+| `RB_ERR_NOT_READY` (-4) | "Device not ready" | the module is not ready / there is no such history record / nothing is armed / nothing answers at the new address | the STD notes above |
 | `RB_ERR_STALE` (-5) | "Period snapshot stale" | the period-ready flag = 0 | "Period snapshots are always stale" section |
 | `RB_ERR_PARAM` (-6) | "Bad parameter" | invalid channel index / invalid model code / invalid address range | "setSensorClass() / setCTModel() returns RB_ERR_PARAM" section |
-| `RB_ERR_MODE` (-7) | "Operation requires factory mode" | a factory-only operation (for example `saveGains()` in production) | do not call factory-only operations on production firmware — these are blocked by design |
-| `RB_ERR_CHECKSUM` (-8) | "Codegen parity mismatch" | (reserved for codegen CI) | — |
+| `RB_ERR_MODE` (-7) | "Not allowed in the module's current mode (factory mode / service path required)" | a factory-only operation, or a CT setter on a module of class `WiredCT` / `BuiltinCT` | do not call factory-only operations on production firmware; use `setCTModelChForce()` only for service re-pairing |
+| `RB_ERR_CHECKSUM` (-8) | "Value check failed — checksum / signature / range" | the module's value check failed (STD: rejected firmware image, payload CRC, epoch out of range, empty history ring) | resend the page / check the image |
 | `RB_ERR_VERSION` (-9) | "Unsupported firmware version" | `REG_VERSION` = 0 / 0xFF | check the module connection |
-| `RB_ERR_NOT_IMPLEMENTED` (-10) | "Not implemented" | (reserved) | — |
+| `RB_ERR_NOT_IMPLEMENTED` (-10) | "Not implemented on this firmware" | the call has no counterpart on the detected line, or the module image does not provide the feature | `dev.line()`, `dev.stdReadImageVersion()` |
 | `RB_ERR_NON_PHYSICAL` (-11) | "Non-physical value (NaN/Inf/out-of-bounds)" | the sanity filter rejected a float | "Readings jump around or come back as NaN" section |
 
 ## Diagnostic counter summary table

@@ -76,7 +76,7 @@ void setup() {
     }
 
     Wire.begin();
-    Wire.setClock(50000);   /* SPEC §B.5 dense-workload baseline */
+    Wire.setClock(50000);   /* dense-workload baseline */
 
     if (!dev.begin()) {
         Serial.print(F("rbAmp begin failed: "));

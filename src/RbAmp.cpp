@@ -907,7 +907,7 @@ bool RbAmp::setSensorClass(RbAmpSensorClass cls) noexcept {
         return false;
     }
     /* SENSOR_CLASS is user_config — persist via CMD_SAVE_USER_CONFIG (ungated).
-     * CMD_SAVE_GAINS is factory/develop-gated and a silent no-op in production. */
+     * CMD_SAVE_GAINS is factory-gated and a silent no-op in production. */
     if (!saveUserConfig()) {
         return false;  /* error already set */
     }
@@ -1038,7 +1038,7 @@ bool RbAmp::setCTModel(uint8_t code) noexcept {
         return false;
     }
     delay(SETTLE_MS_SET_CT_MODEL_CH0);
-    return saveUserConfig() && sctAfterModelWrite();  /* CT_MODEL is user_config — SAVE_GAINS is dev-gated (silent no-op in production) */
+    return saveUserConfig() && sctAfterModelWrite();  /* CT_MODEL is user_config — SAVE_GAINS is factory-gated (silent no-op in production) */
 }
 
 bool RbAmp::setCTModel(uint8_t channel, uint8_t code) noexcept {
@@ -1130,7 +1130,7 @@ bool RbAmp::setCtModelImpl(uint8_t channel, uint8_t code, bool force) noexcept {
             setError(RB_ERR_PARAM);
             return false;
         }
-        return saveUserConfig() && sctAfterModelWrite();  /* CT_MODEL is user_config — SAVE_GAINS is dev-gated (silent no-op in production) */
+        return saveUserConfig() && sctAfterModelWrite();  /* CT_MODEL is user_config — SAVE_GAINS is factory-gated (silent no-op in production) */
     }
 
     /* v1.3 A1 sequence (ch0-2, order-independent — REG_CT_MODEL is pure staging):
@@ -1149,7 +1149,7 @@ bool RbAmp::setCtModelImpl(uint8_t channel, uint8_t code, bool force) noexcept {
         return false;
     }
     delay(5);  /* per commands.yaml settle_ms */
-    return saveUserConfig() && sctAfterModelWrite();  /* CT_MODEL is user_config — SAVE_GAINS is dev-gated (silent no-op in production) */
+    return saveUserConfig() && sctAfterModelWrite();  /* CT_MODEL is user_config — SAVE_GAINS is factory-gated (silent no-op in production) */
 }
 
 /* ============================================================================
@@ -1161,7 +1161,7 @@ bool RbAmp::setCtModelImpl(uint8_t channel, uint8_t code, bool force) noexcept {
  * the module applies the raw preset gain (unit trim lost, seed noise floor);
  * after any restart it applies the factory gain G_cal again while still
  * showing model X. Gain / noise floor are readable in user mode (writes are
- * develop-gated), so the library corrects relative to the gain the module
+ * factory-gated), so the library corrects relative to the gain the module
  * actually applies: s = preset(X) × c(X) × k / G_a with k = G_a / preset(3).
  * ============================================================================ */
 
@@ -1586,7 +1586,7 @@ bool RbAmp::configureChannels(RbAmpSensorClass cls, const uint8_t* models, uint8
 
     /* 3. ONE terminal SAVE for all binds (a UI3 = 2 flash cycles total, not 4). */
     if (any_bound) {
-        return saveUserConfig() && sctAfterModelWrite();  /* CT_MODEL is user_config — SAVE_GAINS is dev-gated (silent no-op in production) */
+        return saveUserConfig() && sctAfterModelWrite();  /* CT_MODEL is user_config — SAVE_GAINS is factory-gated (silent no-op in production) */
     }
     setError(RB_OK);
     return true;

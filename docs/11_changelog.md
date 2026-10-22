@@ -5,24 +5,39 @@ repository root; this chapter keeps the short version.
 
 ## 1.6.1 — STD micro-resolution energy, SCT-013 rating correction, sensor-config guard
 
-Released together with 1.6.0 as the first public release of the two-line
-library.
+Released together with 1.6.0 (the STD line) as the first public release of
+the two-line library.
 
 - **STD line**: micro-resolution energy counters (µWh / µvarh), the starting
-  current for energy, voltage phase angle and phase sequence — for modules
-  whose image publishes them (capability bit 15); older modules behave exactly
-  as before.
-- **BASIC line**: SCT-013 rating correction — on firmware up to 1.4.19 a
+  current for energy (`stdSetEnergyStartCurrent()` / `stdReadEnergyStartCurrent()`),
+  voltage phase angle (`RbAmpStdVoltage::angle_deg`) and phase sequence
+  (`stdReadPhaseSequence()`) — for modules whose image publishes them (image
+  `0x0001007B` or later); older modules behave exactly as before. `stdEnergyDelta()`
+  covers the new fields.
+- **BASIC line — SCT-013 rating correction**: on firmware up to 1.4.19 a
   channel switched to another SCT-013 model is read relative to the gain the
-  module applies (`sctRating()`, `sctRatingRefresh()`, `sctRatingScale()`);
-  firmware 1.4.20+ reports capability bit 12 and corrects itself. Sensor class
-  / CT model setters read before they write (`readSensorClass()`,
-  `setCTModelChForce()`, `sensorModel()` / `sensorModelRatedA()`); a stored
-  configuration can be re-applied on every boot without touching the
-  module's calibration.
+  module applies. `begin()` reads each channel and scales current / power /
+  period power (and the energy derived from it); power factor and voltage are
+  unchanged. New: `sctRatingRefresh()`, `sctRating()`, `sctRatingScale()`,
+  `sctPresetGain()`. Firmware 1.4.20 and later corrects itself. The model
+  setters restart the module after the save on firmware that needs it (one
+  extra ~0.5 s per call).
+- **Sensor class / CT model setters read before they write**
+  (`setSensorClass()`, `setCTModel()`, `configureChannels()`): a stored
+  configuration can be re-applied on every boot without touching the module's
+  calibration. A module of class `WiredCT` / `BuiltinCT` is not reconfigured
+  (`RB_ERR_MODE`); `setCTModelChForce()` is the service path. New:
+  `readSensorClass()`, `RbAmp::sensorModel()` / `RbAmp::sensorModelRatedA()`
+  (registry lookups with the model's current limits).
+- SCT-013-060 and -100 are accepted (they were refused client-side as reserved); sensor-model clip limits updated to measured values.
 - **Both lines**: the measurement window / publish cadence is documented as
-  100 ms; the channel count can never exceed the snapshot arrays; host unit
-  tests run the real sources against a mock bus.
+  100 ms (200 ms kept only as a note for older images); the channel count can
+  never exceed `RBAMP_MAX_CHANNELS` (channels beyond it return
+  `RB_ERR_PARAM`); host unit tests (`extras/host_tests`) run the real sources
+  against a mock bus.
+- `RbAmpStdEnergy` gained fields in this version: if your application saves
+  it as a raw binary blob, store only the fields you need in your own fixed
+  format.
 
 ## 1.6.0 — STD line (16-bit register model)
 
@@ -30,27 +45,52 @@ One library, both product lines: `begin()` detects whether the module speaks
 the BASIC (8-bit) or the STD (16-bit, fixed-point) register model and routes
 every call internally — the method surface is the same on either line.
 
-- `line()`; unified readers on STD (`readVoltage(phase)`, Q / S); the STD block
-  API (`stdInfo()`, `stdReadChannel()`, `stdReadTotals()`, `stdReadEnergy()`,
-  `stdEnergyDelta()`, `stdReadConfig()`); latch banks (`stdArmBanks()`,
-  `stdLatch()`, `stdReadLatch()`); configuration and commands on STD;
-  firmware update over I²C (`stdOtaBegin()` … `stdOtaCommit()`, prepared
-  signed images).
+- `line()` (`RbAmpLine::Basic` / `RbAmpLine::Std`); unified readers on STD
+  (`readVoltage(phase)`, `readCurrent()`, `readPower()` …) plus new
+  `readReactivePower()` / `readApparentPower()` (STD only).
+- The STD block API: `stdInfo()`, `stdReadChannel()`, `stdReadTotals()`,
+  `stdReadVoltage()`, `stdReadHealth()`, `stdReadConfig()`,
+  `stdSetHarmonics()`, `stdCalThdFloor()`; latch banks (`stdArmBanks()`,
+  `stdLatch()`, `stdReadLatch()`, `stdLatchWh()`); life-time counters
+  (`stdReadEnergy()`, `stdEnergyDelta()`).
 - Period source chosen from the module's capabilities (latch banks or
-  persisted counters); latch energy survives a module reset.
+  persisted counters); latch energy survives a module reset; the period
+  snapshot gained `avg_p_total`, `wh_net`, `module_restarted`.
+- Identity, clock, history: `stdIdentify()`, `RbAmp::stdProbe()`,
+  `stdReadImageVersion()`, `stdReadBoardId()`, `stdSetTime()` / `stdReadTime()`,
+  `stdHistInfo()` / `stdHistRead()` / `stdHistReadRaw()` / `stdEventRead()` /
+  `stdHistFlush()`, `stdCommand()` / `stdWaitIdle()` / `stdLocate()`,
+  `RbAmp::stdSetAddressByUid()`.
+- Configuration and commands work on STD (`setSensorClass()`, `setCTModel()`,
+  `configureChannels()`, `saveUserConfig()`, `saveGains()`, address change);
+  every command waits for the module to report it finished and checks its
+  verdict. On STD the CT model is a reference label only.
+- Firmware update over I²C: `stdOtaBegin()` → `stdOtaWritePage()` →
+  `stdOtaCommit()` → `stdOtaActivate()`, `stdOtaWritePreparedImage()` (images
+  prepared by the manufacturer), `stdOtaDiag()`, `stdOtaAbort()`,
+  `stdOtaBoardOk()`.
 - Data-ready line and events on both lines: `setDrdyPin()`, `waitDataReady()`,
-  `readAllReady()`, `readEventFlags()` / `clearEventFlags()`,
-  `setEventThresholds()`.
-- `11_StdLine` example. No BASIC API change.
+  `readAllReady()`, `readDataSeq()`, `beginEventFlags()`, `setEventMask()` /
+  `readEventMask()`, `setEventThresholds()`; `readEventFlags()` /
+  `clearEventFlags()` / `hasError()` work on STD modules that provide the
+  event block.
+- BASIC-only calls (`factoryReset()`, General-Call and label helpers,
+  `readCapability()`, `readCommitSeq()`, `readPeriodLatchMs()`) return
+  `RB_ERR_NOT_IMPLEMENTED` on an STD instance. No BASIC API change.
+- `11_StdLine` example.
 
 ## 1.5.0 — Per-channel CT models + sensor-model registry
 
 - `setCTModel(channel, code)` / `configureChannels()` bind any channel,
   including senior-SKU channels 3+ (through the channel window); every write
-  is confirmed by a read-back.
+  is confirmed by a read-back, and a model the module does not accept is
+  reported as `RB_ERR_PARAM` (the channel keeps its previous model).
+- `readCTModelCh()` covers all channels.
 - Generated sensor-model registry `RbAmpSensorModels.h` (`RBAMP_CT_*` defines,
   descriptors, `rbamp_sensor_model_lookup()`); CT-model validation is
-  registry-driven.
+  registry-driven (the client only rejects codes absent from the registry —
+  acceptance is decided by the module). `RbAmpCTModel` is a frozen alias for the
+  seven SCT-013 codes.
 - CT model / sensor class now persist on production modules
   (`CMD_SAVE_USER_CONFIG`).
 - `10_PerChannelModels` example.
@@ -110,12 +150,11 @@ app-WDT soak).
 ### Changed
 
 - **Energy** is integrated against the master wall-clock, **never**
-  against the chip's diagnostic `latch_ms` (the chip timer undercounts by
-  ~25-30%). On a stale period anchor, integration is **held** — the next
+  against the chip's diagnostic `latch_ms` (a module diagnostic timer, not
+  for energy). On a stale period anchor, integration is **held** — the next
   valid window is not undercounted.
 - **CT model** codes follow the v1.3 per-class accepted set — `Sct013`
-  accepts `{005, 010, 030, 050, 020}`; `SCT-013-100` and `-060` are
-  recognised SKUs but **uncharacterised**, and are rejected client-side.
+  accepts `{005, 010, 030, 050, 100, 020, 060}`.
   `REG_CT_MODEL` is pure staging: bind via the per-channel command,
   multi-channel binds are **order-independent**, and never clobber
   channel 0.

@@ -6,9 +6,9 @@ requirements, I²C level compatibility, bus length, and wiring diagrams
 for specific Arduino boards (UNO, Mega, ESP32, ESP8266, STM32duino,
 RP2040).
 
-The module's mains side is already routed inside the enclosure and
-galvanically isolated — you work only with the LV side (power +
-I²C + optional `DRDY`).
+The LV side (power + I²C + optional `DRDY`) is isolated from the mains
+terminals. The mains terminals and the CT-side wiring are connected to
+mains — see the warning in "Mains-side wiring" below.
 
 ## LV-side pinout
 
@@ -22,7 +22,7 @@ from mains.
 | `GND` | Ground | Shared with the master — **mandatory** |
 | `SDA` | I²C SDA | I²C data |
 | `SCL` | I²C SCL | I²C clock |
-| `DRDY` | Data-ready (optional) | Open-drain, LOW pulse ~10 µs every ~200 ms |
+| `DRDY` | Data-ready (optional) | Open-drain, LOW pulse ~10 µs every ~100 ms |
 
 ## Power
 
@@ -61,12 +61,11 @@ your code simply calls `begin()` and continues.
 
 ### Isolation
 
-Inside the module there is a galvanic isolation barrier between the mains side
-(CT clamp, voltage divider) and the LV side (I²C). Consequences:
+The LV side (I²C, power, `DRDY`) is isolated from the mains terminals.
+Treat the mains terminals and the CT-side wiring as live.
 
-- The module's `GND` is **not connected** to the mains line or neutral.
-- Connecting the LV side to a 5 V master is safe — there is no risk of a short
-  circuit through ground.
+- The module's `GND` is not connected to the mains line or neutral.
+- Do not touch the L/N terminals or the clamp conductor while the circuit is energised.
 
 > ⚠ Do not open the module enclosure — this voids the factory calibration.
 
@@ -115,7 +114,7 @@ blade to disable a pull-up:
 
 - **Default address**: `0x50` (7-bit)
 - **Address range**: `0x08..0x77` (reassigned via two-phase address commit, production-OK)
-- **Recommended speed**: **50 kHz** on ESP32/ESP8266 (the host-side driver shows a ~20% NACK rate at 100 kHz; at 50 kHz + 3× retry it is < 0.8%). 100 kHz with retry is workable. 400 kHz is **not validated**.
+- **Speed**: UNO / Mega / STM32 / RP2040 100 kHz; ESP32 / ESP8266 50 kHz. Do not use 400 kHz.
 - **Pointer auto-increment**: **on reads only**. A burst-read of `<addr> + N bytes` returns N consecutive bytes starting at `addr`. **Writes are NOT auto-increment**: a burst-write drops bytes 1..N and only the first lands. Multi-byte registers are written **byte by byte** in separate single-byte transactions. See [09 · API Reference](09_api_reference.md) — "Multi-byte writes".
 
 ### Bus length
@@ -137,6 +136,8 @@ rbAmp:
 
 ## Mains-side wiring (sensors)
 
+> ⚠ **Mains voltage can kill.** Disconnect and lock out the circuit before connecting the L/N terminals or fitting the clamp; have a qualified person do mains wiring and any work inside a panel. Clamp ONE conductor only (L) — never the whole cable (L+N cancel to ~0). Fuse the L tap per local rules.
+
 ### Voltage sensor (UI* variants)
 
 The board exposes `L` (line) and `N` (neutral) terminals. **Polarity
@@ -151,8 +152,8 @@ Correct polarity is critical for:
 
 - Correct accounting on the BASIC tier (BASIC counts only `max(P, 0)`;
   with swapped polarity the energy counter stays at zero).
-- Correctly separating consumption and generation on STANDARD and PRO
-  (once implemented).
+- Correctly separating consumption and generation on the STANDARD (STD)
+  line.
 
 > **Quick check**: on a purely resistive load (electric kettle,
 > heater, incandescent lamp) `P > 0` and `PF ≈ 1.0`. If P is
@@ -166,12 +167,11 @@ connector. The connector is keyed — no wiring decisions need to be made.
 An arrow on the clamp body shows the current direction for the "normal"
 orientation. Rules:
 
-- Clamp the CT around the **line conductor (L)** going to the load.
+- Clamp the CT around the **line conductor (L) only** going to the load.
 - The arrow on the clamp must point **in the direction of current**
   toward the load (from the breaker to the load).
 - The clamp must **close fully** — with no gap between the
-  halves of the magnetic core. A gap > 0.1 mm sharply increases
-  magnetic reluctance and degrades accuracy.
+  halves of the magnetic core. If the halves do not click fully shut, accuracy is lost.
 
 > ⚠ **Do not run both L and N through a single clamp at once**. Their
 > magnetic fluxes are equal and opposite, so they cancel each
@@ -186,17 +186,23 @@ how to tell the module via `dev.setCTModel(code)` — see
 ## DATA_READY (DRDY)
 
 An optional pin for polling optimization. If the application polls the
-module no more often than once every 200 ms, `DRDY` can be left unconnected.
+module no more often than once every 100 ms, `DRDY` can be left unconnected.
 
 ### Electrical parameters
 
 - **Output type**: open-drain (no active pull-up to VCC)
 - **Idle level**: HIGH (requires a pull-up on the master side —
-  the MCU's built-in pull-up or an external resistor; 10 kΩ to
-  3.3 V recommended)
+  the MCU's built-in pull-up or an external resistor)
 - **Ready pulse**: LOW for ~10 µs after the RT registers
   (`0x86..0xCF`) have been updated with fresh data
-- **Pulse frequency**: ~5 Hz (one pulse per ~200 ms RT window)
+- **Pulse frequency**: ~10 Hz (one pulse per ~100 ms RT window)
+
+The library can use the line for you: `dev.setDrdyPin(pin)` attaches it
+(internal pull-up, falling-edge interrupt) and `dev.waitDataReady()` /
+`dev.readAllReady()` wait for the module's next snapshot — see
+[09 · API reference](09_api_reference.md#data-ready-line-and-events). Several
+modules may share one `DRDY` line (wired-OR); a line held solid LOW means a
+module has a masked event pending (alarm). Without a line the same calls poll.
 
 ### Semantics
 
@@ -209,7 +215,7 @@ an ISR before pulling the pin low). After the falling edge the master can read
 
 - **External interrupt** (`attachInterrupt` on the falling edge) — wakes
   the master and triggers a read.
-- **Pull-up**: either `INPUT_PULLUP` on the MCU, or an external 10 kΩ to 3.3 V. **On AVR hosts use an external 10 kΩ to 3.3 V** — the built-in pull-up (~40 kΩ) is too weak for long DRDY lines.
+- **Pull-up**: either `INPUT_PULLUP` on the MCU, or an external 10 kΩ to 3.3 V. **On UNO / Nano (AVR) use an external 10 kΩ to 3.3 V** — the built-in pull-up (~40 kΩ) is too weak for long DRDY lines.
 
 ```cpp
 const int PIN_DRDY = 15;
@@ -242,8 +248,9 @@ void loop() {
 }
 ```
 
-`DRDY` is **optional** — polling at any rate ≤ 5 Hz works without
-it. The library does not depend on `DRDY` in any of its paths.
+`DRDY` is **optional** — polling at any rate ≤ 10 Hz works without
+it. The library does not depend on `DRDY`; `setDrdyPin()` / `waitDataReady()`
+are opt-in helpers.
 
 ## Connecting to different Arduino hosts
 
@@ -268,7 +275,7 @@ RbAmp dev(Wire, 0x50);
 
 void setup() {
     Wire.begin();          // SDA=A4, SCL=A5 by default
-    Wire.setClock(100000); // 100 kHz — the AVR I²C peripheral needs no 50 kHz clamp
+    Wire.setClock(100000); // 100 kHz — no 50 kHz clamp needed on AVR
     while (!dev.begin()) { delay(500); }
 }
 ```
@@ -308,7 +315,7 @@ RbAmp dev(Wire, 0x50);
 
 void setup() {
     Wire.begin(21, 22);    // SDA=21, SCL=22 (or Wire.begin() with board defaults)
-    Wire.setClock(50000);  // ESP32: 50 kHz — mandatory for retry discipline
+    Wire.setClock(50000);  // ESP32: 50 kHz
     while (!dev.begin()) { delay(500); }
 }
 ```
@@ -323,7 +330,7 @@ from the DevKitC's +5V pin (which is connected to USB-5V directly).
 > #include <RbAmp.h>
 > ```
 >
-> The macro is opt-in (not default-on) — so that explicit user calls such as `Wire.setClock(400000)` for OLED-on-shared-bus patterns are preserved. Both forms work — pick the one that reads better in your sketch.
+> The macro is opt-in (not default-on) — so that explicit user calls to `Wire.setClock()` (for example when an OLED shares the bus) are preserved. Both forms work — pick the one that reads better in your sketch.
 
 > If your ESP32 board does not break out a 5 V pin (some compact
 > ESP32-S3 / C3 modules get by with only Vin or no 5 V at all) —
@@ -429,15 +436,15 @@ depend on the board.
                             |   LV side            |  mains side
 ESP32 GPIO22 (SCL) ---------| SCL                  |◄[CT jack 3.5mm]── SCT-013 → to L
 ESP32 GPIO21 (SDA) ---------| SDA                  |◄[L terminal]──── L wire
-ESP32 GPIO15 (IN) ◄──[10K]─┐| DRDY (open-drain)    |◄[N terminal]──── N wire
-                    to 3.3V |                      |
+ESP32 GPIO15 (IN, opt.)-----| DRDY (open-drain)    |◄[N terminal]──── N wire
+                            |                      |
 ESP32 +5V    ---------------| VCC                  |
 ESP32 GND    ---------------| GND                  |
                             +----------------------+
 
 In this configuration:
  - External pull-ups on I²C are NOT needed (built into the module).
- - 10K on DRDY is a mandatory external pull-up.
+ - DRDY is optional; INPUT_PULLUP on the ESP32 pin is enough.
  - The SCT-013 jack is fully inserted.
  - The clamp is fully closed on the L wire, arrow toward the load.
 ```
@@ -451,7 +458,7 @@ In this configuration:
 UNO A5 (SCL) ---------------| SCL                  |◄[CT jack 3.5mm]── SCT-013 → to L
 UNO A4 (SDA) ---------------| SDA                  |◄[L terminal]──── L wire
 UNO D2 (IN, opt.) ◄──[10K]─┐| DRDY (open-drain)    |◄[N terminal]──── N wire
-                    to 3.3V |                      |
+          (10K to 3.3 V)    |                      |
 UNO +5V      ---------------| VCC                  |
 UNO GND      ---------------| GND                  |
                             +----------------------+
@@ -469,12 +476,27 @@ In this configuration:
    To 3.3 V — never a problem.
 ```
 
-## Multi-phase models
+## Multi-phase models and the STANDARD (STD) line
 
-For future multi-phase SKUs the LV pinout is **preserved** (VCC / GND
+Multi-channel and multi-phase SKUs keep the same LV pinout (VCC / GND
 / SDA / SCL / DRDY). Only the mains side changes — more L terminals and
-more CT jack connectors. Existing user code will not need to be rewritten;
-the library will add registers for the additional channels.
+more CT jack connectors.
+
+**STANDARD (STD) modules use the same I²C wiring as BASIC modules** — same
+four signal lines, same pull-up and bus rules as above. Nothing changes in the
+connection; `dev.begin()` detects which line is attached (`dev.line()`), and
+the same sketch serves both. Notes:
+
+- Calls that exist only on the STD line (the `std*` family, reactive and
+  apparent power) return `RB_ERR_NOT_IMPLEMENTED` on a BASIC module (on BASIC, reactive power is not exposed by this library).
+- Some STD features depend on the **module image version**: micro-resolution
+  energy counters, the starting current for energy, voltage phase angles and
+  the phase sequence need an image of at least `0x0001007B`
+  (`dev.stdReadImageVersion()`). On an older image they are reported as "not
+  available".
+- The number of voltage and current channels comes from the module
+  (`dev.stdInfo()`); the library exposes up to `RBAMP_MAX_CHANNELS` (7)
+  current channels.
 
 ## Multi-module bus — the primary topology
 
@@ -552,7 +574,7 @@ Used when `RbAmpFleet` has not been created.
 > The most common source of provisioning failures is having
 > **more than one** module with the factory address `0x50` on the bus.
 > It is **physically impossible** to distinguish them over I²C
-> (open-drain wired-AND — both modules will ACK identically, and the
+> (open-drain bus: both modules will ACK identically, and the
 > read-back data will be "stuck together").
 >
 > **So the rule is strict (a normative MUST, not a recommendation):**
@@ -575,14 +597,14 @@ At 50 kHz, one read transaction ≈ 200-400 µs. A full RT block of one channel 
 
 | Configuration | Bus per cycle | At 50 kHz | Max polling rate |
 |---|---|---|---|
-| 1× UI1, RT block | ~5 ms | < 5 ms | 100+ Hz (but the module updates at 5 Hz) |
-| 1× UI3, RT block + period | ~25 ms | ~25 ms | 5 Hz |
-| 5× UI1, RT block | ~25 ms | ~25 ms | 5 Hz |
-| 16× UI3, RT + period | ~400 ms | **400 ms > 200 ms** | **can't keep up with the module** |
+| 1× UI1, RT block | ~5 ms | < 5 ms | 100+ Hz (but the module updates at 10 Hz) |
+| 1× UI3, RT block + period | ~25 ms | ~25 ms | up to 10 Hz |
+| 5× UI1, RT block | ~25 ms | ~25 ms | up to 10 Hz |
+| 16× UI3, RT + period | ~400 ms | **400 ms > 100 ms** | **can't keep up with the module (10 Hz); ~2 Hz at best** |
 
-> The numbers are estimates (200-400 µs/transaction depends on the MCU). Exact values will be confirmed by a bench test.
+> The numbers are estimates (200-400 µs/transaction depends on the MCU). The numbers are estimates and depend on the host MCU.
 
-**Rule**: at 50 kHz the comfortable limits are **8-10× UI3** or **15-16× UI1** at 5 Hz polling.
+**Rule**: at 50 kHz the comfortable limits are **8-10× UI3** or **15-16× UI1** at 5 Hz polling (every second module window), and roughly half of that at the full 10 Hz.
 
 ### Period sync
 
@@ -593,7 +615,7 @@ For tariff metering, all modules must latch **the same** interval. Two strategie
 ```cpp
 RbAmp meters[N];   // array of initialized modules
 
-void billing_cycle() {
+void period_cycle() {
     // Phase 1: sequential latch
     for (auto& m : meters) m.latchPeriod();
 
@@ -608,7 +630,7 @@ void billing_cycle() {
 }
 ```
 
-Skew between modules: 16 modules × ~1 ms/latch = ~16 ms relative to a 60-s period → 0.027%. Negligible for billing.
+Skew between modules: 16 modules × ~1 ms/latch = ~16 ms across a 60-s period. Negligible for energy totals.
 
 **Strategy 2 — General-Call broadcast latch** (requires enable):
 
@@ -627,7 +649,7 @@ Skew = 0 (atomic). Pre-config (once on each module of the fleet):
 
 Which to use:
 - **< 8 modules**: strategy 1 (simpler, no enable required).
-- **≥ 8 modules** or **billing-grade synchronization**: strategy 2.
+- **≥ 8 modules** or **tight synchronization**: strategy 2.
 
 ### GC group filtering (multi-tenant bus)
 
@@ -644,12 +666,12 @@ Use case — separating tariff groups (day vs night) on one shared bus.
 |---|---|---|
 | `i2c bus scan` shows several modules at one address after a field add | A new module at `0x50` conflicts with an already-addressed one | Re-address the new module **separately** before adding it |
 | One module NACKs more often than the others | Cable fault / VCC drop | Check VCC under load |
-| One module's Wh consistently diverges | Module clock drift (LSI) | Clock-drift calibration on the bench |
+| One module's Wh consistently diverges | The module's own clock differs from the master's | Energy is integrated on the master clock; compare with `master_dt_ms`, not `latch_ms` |
 | After a GC frame, one module does not latch | `FLEET_CONFIG.bit0 = 0` or group mismatch | Check `REG_FLEET_CONFIG` and `REG_GROUP_ID` |
 
 ### Bus design notes
 
-- **Clock stretching**: the module's latch produces a short `__disable_irq` (~µs); SCL is not stretched significantly. For the Raspberry Pi BCM283x (known hw bug in stretching): the standard precaution is 50 kHz + retry.
+- **Clock stretching**: the module's latch pauses it only for microseconds; SCL is not stretched significantly. For the Raspberry Pi BCM283x (known hw bug in stretching): the standard precaution is 50 kHz + retry.
 - **Length with >4 modules**: consider an I²C buffer (PCA9515) at ≥ 8 modules + length > 1 m.
 
 Detailed multi-module scenarios — in [06 · Examples](06_examples.md).

@@ -157,7 +157,7 @@ arduino-esp32), there is a dedicated `rbamp` external component:
 
 ```yaml
 external_components:
-  - source: github://rbamp/rbamp-esphome
+  - source: github://rb-amp/rbamp-esphome
     components: [rbamp]
     refresh: 0s
 
@@ -365,7 +365,7 @@ broker handles the fan-out to subscribers. Do not push from the
 ESP32 to N HTTP endpoints directly: that couples the device to
 specific consumers.
 
-For a very high-rate stream (5 Hz RT), run a sidecar Python script
+For a very high-rate stream (10 Hz RT), run a sidecar Python script
 on the Pi that hosts the broker — subscribe to the fast topic,
 decimate, and republish to the slow topics. The ESP32 I²C loop
 should stay focused on the `dev.read*()` calls without HTTP overhead.

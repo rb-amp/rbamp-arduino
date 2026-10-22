@@ -1,8 +1,7 @@
 # Examples
 
-Walkthrough of the 7 bundled `examples/` sketches plus 3 composed scenarios.
-Every numbered example below has matching code in [`examples/`](../examples/)
-or [`../examples/` at the rbAmp mono-repo level](../../examples/) — open the
+Walkthrough of the bundled `examples/` sketches plus composed scenarios.
+Most numbered examples below have matching code in [`examples/`](../examples/) — open the
 real sketches in the Arduino IDE for the full source.
 
 | # | Title | Difficulty | Source file |
@@ -14,9 +13,10 @@ real sketches in the Arduino IDE for the full source.
 | 5 | [Master-side bidirectional accounting](#scenario-5--master-side-bidirectional-accounting) | medium | [`06_BidirectionalEnergy.ino`](../examples/06_BidirectionalEnergy/06_BidirectionalEnergy.ino) |
 | 6 | [Home energy balance](#scenario-6--home-energy-balance) | high | (composed) |
 | 7 | [Event detection (EMA)](#scenario-7--event-detection-ema) | medium | (composed) |
-| 8 | [12-hour autonomous bench monitor](#scenario-8--12-hour-autonomous-bench-monitor) | medium | [`SoakMonitor.ino`](../../examples/SoakMonitor/SoakMonitor.ino) |
+| 8 | [12-hour autonomous bench monitor](#scenario-8--12-hour-autonomous-bench-monitor) | medium | (code in this chapter) |
 | 9 | [Battery deep-sleep logger](#scenario-9--battery-deep-sleep-logger) | medium | [`07_DeepSleepLogger.ino`](../examples/07_DeepSleepLogger/07_DeepSleepLogger.ino) |
 | 10 | [I2C address change](#scenario-10--i2c-address-change) | low | [`05_AddressChange.ino`](../examples/05_AddressChange/05_AddressChange.ino) |
+| 11 | [One sketch, both module lines (BASIC + STD)](#scenario-11--one-sketch-both-module-lines) | medium | [`11_StdLine.ino`](../examples/11_StdLine/11_StdLine.ino) |
 
 ---
 
@@ -134,7 +134,7 @@ Three rbAmp modules on one bus at 0x50 / 0x51 / 0x52. Each must have a
 unique I2C address — use [scenario 10](#scenario-10--i2c-address-change)
 to assign addresses during installation.
 
-> **v1.3 coherent latch (`CAP_GC_LATCH`):** every module that has opted into
+> **v1.3 coherent latch:** every module that supports the General-Call latch and has opted into
 > the General-Call latch (`enableGc(true)`, persisted) captures the *same*
 > mains period on a single all-call frame —
 > `RbAmp::broadcastLatchGroup(Wire, 0x00, tick)`. Fleet skew is < 10 µs, so
@@ -224,7 +224,7 @@ void setup() {
     mqtt.connect("rbamp-ui3");
 
     Wire.begin();
-    Wire.setClock(50000);    // SPEC §B.5 on ESP32
+    Wire.setClock(50000);    // reduced bus clock on ESP32
     dev.setLogStream(&Serial);
     while (!dev.begin()) { delay(500); }
 }
@@ -249,7 +249,7 @@ void loop() {
 
 Full sketch in [`04_UI3PerChannelMQTT.ino`](../examples/04_UI3PerChannelMQTT/04_UI3PerChannelMQTT.ino).
 For HA MQTT Auto-discovery on top of this base, see
-[DIY Integrations](07_diy_integrations.md#home-assistant-mqtt-auto-discovery).
+[DIY Integrations](07_diy_integrations.md#home-assistant--mqtt-auto-discovery).
 
 ---
 
@@ -257,7 +257,7 @@ For HA MQTT Auto-discovery on top of this base, see
 
 Split signed RT power into gross consume / gross export buckets. Use on
 BASIC tier modules where the period accumulator clamps negative — sample
-`dev.readPower(0)` at 5 Hz on the master side.
+`dev.readPower(0)` at 10 Hz on the master side.
 
 ```cpp
 #include <Wire.h>
@@ -277,7 +277,7 @@ void setup() {
 }
 
 void loop() {
-    if (millis() - last_sample_ms < 200) { delay(5); return; }   // 5 Hz — matches RT cadence
+    if (millis() - last_sample_ms < 100) { delay(5); return; }   // 10 Hz — matches RT cadence
     const uint32_t now_ms = millis();
     const uint32_t dt_ms  = now_ms - last_sample_ms;
     last_sample_ms = now_ms;
@@ -302,7 +302,7 @@ void loop() {
 ```
 
 Full sketch in [`06_BidirectionalEnergy.ino`](../examples/06_BidirectionalEnergy/06_BidirectionalEnergy.ino).
-On STANDARD / PRO tier, `dev.energy().wh(0)` already gives you the
+On a STANDARD (STD) module, `dev.energy().wh(0)` already gives you the
 signed net balance — you only need this master-side split for gross
 consume vs gross export reporting.
 
@@ -310,7 +310,7 @@ consume vs gross export reporting.
 
 ## Scenario 6 — Home energy balance
 
-Three modules: mains (bidir, STANDARD/PRO) + solar (gen-only, BASIC OK)
+Three modules: mains (bidir, STANDARD (STD)) + solar (gen-only, BASIC OK)
 + loads (UI3 BASIC for per-appliance). Combined whole-house dashboard
 published every 60 s.
 
@@ -364,13 +364,13 @@ void loop() {
 ```
 
 For the explicit consume/export split on the mains module, combine with
-Scenario 5's pattern (run a separate 5 Hz loop on `mains.readPower(0)`).
+Scenario 5's pattern (run a separate 10 Hz loop on `mains.readPower(0)`).
 
 ---
 
 ## Scenario 7 — Event detection (EMA)
 
-On every 200 ms RT window, compare P against an exponentially-weighted
+On every 100 ms RT window, compare P against an exponentially-weighted
 moving average. Log significant deviations (microwave / kettle).
 
 ```cpp
@@ -427,7 +427,7 @@ Key features:
 - **`RBAMP_NACK_RETRY_ATTEMPTS=5` override** — define BEFORE the include
   to tune retry for dense workloads (≥10 single-byte reads per cycle).
   Default 3 suffices for ESPHome 60 s polling; SoakMonitor reads ~45
-  bytes per cycle and needs the extra headroom per SPEC §B.5 Phase 2.
+  bytes per cycle and needs the extra headroom.
 - **`dev.rawTopology()`** — direct wire read of REG_TOPOLOGY (0x24) for
   v1.1 detection. Returns 1/2/3 on v1.1, `0x00` on v1.0, `0xFF` on
   I2C failure.
@@ -455,7 +455,7 @@ void emitCycle() {
     RbAmpPeriodSnapshot snap;
     const bool snap_ok = dev.readPeriodSnapshot(snap, 60);
 
-    /* CSV row — see SoakMonitor.ino for full 26-column format */
+    /* CSV row (shortened) */
     Serial.printf("%lu,%.3f,%.4f,%.3f,%.4f,%.1f,%.4f,%lu,%lu,%.6f,%lu,%lu,%u\n",
         millis(), u, i[0], p[0], pf[0], freq,
         snap.avg_p[0], snap.latch_ms, snap.master_dt_ms,
@@ -480,7 +480,7 @@ void loop() {
 }
 ```
 
-Full SoakMonitor sketch in [`../../examples/SoakMonitor/SoakMonitor.ino`](../../examples/SoakMonitor/SoakMonitor.ino).
+The sketch is built from the snippets in this scenario.
 Run with `arduino-cli monitor -p COM3 -c baudrate=115200 > soak.csv` and
 leave 12-15 h unattended. Acceptance: `retry_exhaust == 0`,
 `sanity_reject == 0`, `period_ok / period_total ≥ 99 %`, Wh monotonic.
@@ -558,7 +558,7 @@ On current firmware (v1.3+), changing a module's I²C address needs no
 special mode, jumper, or factory tooling — you stage the new address,
 arm the change, and commit it (a two-phase, magic-armed sequence so an
 address can't change by accident), and the module reboots at its new
-address. The library enforces the SPEC §10 two-step protocol —
+address. The library enforces a two-step protocol —
 `prepareAddressChange()` arms, `commitAddressChange()` writes within a
 5-second window.
 
@@ -612,6 +612,34 @@ single bad call could lose the device.
 
 ---
 
+## Scenario 11 — One sketch, both module lines
+
+Example [`11_StdLine`](../examples/11_StdLine/11_StdLine.ino) shows that one
+sketch serves BASIC and STANDARD (STD) modules. `begin()` detects the line;
+the common read calls (`readVoltage()`, `readCurrent()`, `readPower()`,
+`readPowerFactor()`, `readFrequency()`) work on either, and the STD-only
+extras — reactive and apparent power, per-channel block reads
+(`stdReadChannel()`), health counters (`stdReadHealth()`) and the period latch
+banks — sit behind a `line()` check:
+
+```cpp
+if (dev.line() == RbAmpLine::Std) {
+    RbAmpStdChannel c;
+    if (dev.stdReadChannel(0, c)) {
+        Serial.print(F("Q0=")); Serial.print(c.q, 1);
+        Serial.print(F(" var  S0=")); Serial.println(c.s, 1);
+    }
+} else {
+    // BASIC: reactive power is not exposed by this library
+}
+```
+
+On a BASIC module the `std*` calls return `RB_ERR_NOT_IMPLEMENTED`. The
+call-by-call description is in
+[09 · API reference § STD line API](09_api_reference.md#std-line-api).
+
+---
+
 ## Comparison table
 
 | # | LOC | I2C bus | Period? | DRDY? | MQTT? | Persistence |
@@ -626,6 +654,7 @@ single bad call could lose the device.
 | 8 | ~250 | dedicated | yes | no | no | none (CSV stream) |
 | 9 | ~150 | dedicated | yes | no | yes | RTC memory + MQTT |
 | 10 | ~50 | dedicated | n/a | no | no | flash (slave-side) |
+| 11 | ~130 | dedicated | yes | no | no | none |
 
 ## What next
 

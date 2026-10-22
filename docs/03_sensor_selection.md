@@ -15,16 +15,14 @@ check) is covered in [04_hardware.md](04_hardware.md). This chapter is about
 ## Sensor class
 
 rbAmp modules work with CT clamps from the **SCT-013** family. The
-sensor class is determined by the module's hardware revision and is
-fixed at the factory — the user declares their choice via
-`setSensorClass()` before picking a specific CT clamp model.
+sensor class for a clip-on SCT-013 clamp that you fit yourself is set once with
+`setSensorClass(Sct013)`, before picking the model. If your module came
+with its CT already attached, skip the setup calls in this chapter.
 
 ## Choosing an SCT-013 model
 
-Within the SCT-013 family, five models are characterized on the
-current bench setup (codes `{1, 2, 3, 4, 6}`); codes `5` and `7` are
-present in the API and SPEC but are not yet validated and are
-**rejected** by the library.
+Within the SCT-013 family, seven models are supported (codes
+`{1, 2, 3, 4, 5, 6, 7}`).
 
 | `code` | Model | Current range | Status | Typical use |
 |:---:|---|---|:---:|---|
@@ -32,17 +30,15 @@ present in the API and SPEC but are not yet validated and are
 | **2** | SCT-013-010 | 0…10 A | ✅ characterized | One mid-power appliance — refrigerator, washing machine, air conditioner up to 2 kW |
 | **3** | SCT-013-030 | 0…30 A | ✅ characterized | Mid-sized household service entrance — up to ~7 kW |
 | **4** | SCT-013-050 | 0…50 A | ✅ characterized | Large service entrance — electric heating, EV charger, single-family home with peak loads |
-| **5** | SCT-013-100 | 0…100 A | ⏳ uncharacterized | (Main service entrance of a home or small office; code reserved but requires bench validation.) |
+| **5** | SCT-013-100 | 0…100 A | ✅ characterized | Main service entrance of a home or small office |
 | **6** | SCT-013-020 | 0…20 A | ✅ characterized | Medium service entrance — 3-4 kW appliances, heavy household appliances |
-| **7** | SCT-013-060 | 0…60 A | ⏳ uncharacterized | (Industrial sub-meter; code reserved but requires bench validation.) |
+| **7** | SCT-013-060 | 0…60 A | ✅ characterized | Industrial sub-meter |
 
-> **Production-safe codes — `{1, 2, 3, 4, 6}`**. Use only the
-> characterized codes in production. Attempting `dev.setCTModel(5)`
-> or `dev.setCTModel(7)` (or passing such a code to
-> `configureChannels(...)`) on the current hardware returns **`false`**
-> with `lastError() == RB_ERR_PARAM` — the library will **not send** the
-> write to the device (client-side guard). These codes will become
-> available once the corresponding models have been bench-calibrated.
+> **Accepted codes — `{1, 2, 3, 4, 5, 6, 7}`**. A code outside this set
+> (for example `0` or `8`) passed to `dev.setCTModel(...)` (or to
+> `configureChannels(...)`) returns **`false`** with
+> `lastError() == RB_ERR_PARAM` — the library does not send the write to
+> the device (client-side guard).
 >
 > Codes `0x06` and `0x07` are non-monotonic by rating — they were
 > added after the original `0x01..0x05` set. Always choose by the
@@ -54,10 +50,11 @@ The basic rule:
 
 1. **Determine the maximum current** that can flow in the circuit
    (largest load + 30 % margin).
-2. Pick the model whose range that value fits into.
-3. **Do not over-spec by more than 5×**. An SCT-013-100 clamp on a
-   circuit with a maximum current of 5 A will work, but it will give
-   low resolution and high error at typical values.
+2. Read the model off the label printed on the clamp.
+3. **One rule: choose the smallest rated clamp above your largest expected
+   current.** A clamp rated too small clips at peaks and reads too low; one
+   rated far too large reads noisily at small currents (an SCT-013-100 on a
+   5 A circuit works, but with poor resolution).
 
 ### Headroom
 
@@ -79,7 +76,7 @@ before `setSensorClass()`, the module returns an `RB_ERR_PARAM` error
 and the preset will NOT load.
 
 > **The CT model is a functional preset, not a label.** Writing the CT
-> model **immediately applies** the NF baseline, gain, and shape factor
+> model **immediately applies** the factory calibration for that clamp model
 > to the module's measurement pipeline; the current readings change.
 > Changing the sensor_class resets the CT model to default (0) and
 > requires re-setting it.
@@ -104,7 +101,7 @@ void setup() {
     if (!dev.setCTModel(RbAmpCTModel::Sct013_030)) {
         // Possible causes (any → RB_ERR_PARAM):
         //  1. setSensorClass() was not called before setCTModel()
-        //  2. code not in the per-class accept-set (for Sct013: {1,2,3,4,6}; code 5 reserved)
+        //  2. code not in the per-class accept-set (for Sct013: {1,2,3,4,5,6,7})
         //  3. no factory preset for the selected class
         //     (applies to WiredCT / BuiltinCT in the current firmware)
         //  4. communication error (RB_ERR_IO, not RB_ERR_PARAM — a separate code)
@@ -231,7 +228,7 @@ dev.setCTModel(2, 6);   // SCT-013-020
 dev.saveUserConfig();    // explicit save at the end (3-SAVE alternative, slower)
 ```
 
-> ✅ **Binding order is arbitrary (v1.3 canon).** Writing `REG_CT_MODEL (0x05)`
+> ✅ **Binding order is arbitrary (v1.3).** Writing `REG_CT_MODEL (0x05)`
 > stages the value but does **not apply** it to any channel automatically.
 > Application happens **only** through the per-channel `CMD_SET_CT_MODEL_CHn`,
 > which takes the current staged value and writes it to its channel.
@@ -252,7 +249,7 @@ dev.setCTModel(1, RbAmpCTModel::Sct013_005);   // ch0 is rewritten with the same
 dev.setCTModel(2, RbAmpCTModel::Sct013_005);
 ```
 
-> **Backward compatibility**: the integer overload `setCTModel(uint8_t code)` is retained. v1.3 mapping: `1`=`Sct013_005`, `2`=`Sct013_010`, `3`=`Sct013_030`, `4`=`Sct013_050`, `6`=`Sct013_020`. Code `5` (the former `Sct013_100`) is reserved in v1.3 firmware → `RB_ERR_PARAM`. The typed `RbAmpCTModel::Sct013_NNN` enum is the recommended form (the compiler will catch invalid values before the wire call). On multi-channel modules, the single-argument `setCTModel(code)` applies to channel 0 — equivalent to `setCTModel(0, code)`.
+> **Backward compatibility**: the integer overload `setCTModel(uint8_t code)` is retained. v1.3 mapping: `1`=`Sct013_005`, `2`=`Sct013_010`, `3`=`Sct013_030`, `4`=`Sct013_050`, `5`=`Sct013_100`, `6`=`Sct013_020`, `7`=`Sct013_060`. The typed `RbAmpCTModel::Sct013_NNN` enum is the recommended form (the compiler will catch invalid values before the wire call). On multi-channel modules, the single-argument `setCTModel(code)` applies to channel 0 — equivalent to `setCTModel(0, code)`.
 
 ## Multi-channel modules — I2 and I3 (current-only)
 
@@ -335,7 +332,7 @@ The master itself chooses which channel to use based on the current
 value — while the small clamp is in its linear range, its reading is
 more accurate; when exceeded, it switches to the large one.
 
-### Configuration (any order — v1.3 canon)
+### Configuration (any order — v1.3)
 
 The sensor class first **once**, then the per-channel models in any
 order. On v1.3 firmware writing `REG_CT_MODEL` only **stages** a value;
@@ -381,12 +378,10 @@ float read_combined_current(RbAmp& dev) {
 
 <!-- MD028 separator -->
 
-> ⚙ **Bench validation.** The exact figures for the dual-CT pattern
-> (behavior near the threshold, temperature drift, the divergence of
-> the two clamps in the overlapping range) are established by the
-> factory bench-validation program. Until it is
-> complete, treat dual-CT as a pilot pattern; for critical
-> applications, a single clamp matched to the upper end of the load
+> ⚙ **Limitation.** Figures for low-current dual-CT use (behavior near the
+> threshold, temperature drift, the divergence of the two clamps in the
+> overlapping range) are not published. Treat dual-CT as a pilot pattern; for
+> critical applications, a single clamp matched to the upper end of the load
 > range is preferable.
 
 ### Approaches to improving sensitivity at low currents
@@ -400,20 +395,17 @@ Three strategies in increasing order of complexity:
 1. **Size the CT to the maximum, not "with margin"**. The most common
    mistake is putting an SCT-013-100 (100 A) on a household outlet with
    a typical consumption of 0.5–10 A. The signal sits in the lower
-   1–10 % of the ADC — where the noise becomes comparable to the
+   1–10 % of the sensor's range — where the noise becomes comparable to the
    signal. For a household scenario (16 A outlet) an SCT-013-030 is
    optimal; for connecting a single device (≤ 5 A) an SCT-013-005.
 2. **Dual-CT topology** (requires an I2/I3 SKU — two current channels on one module): a small clamp for the
    lower range + a large one for the upper range, with the master
    choosing by threshold. See the "Dual-CT topology" section above —
-   the pattern is a pilot, and the numbers are being refined by the
-   factory bench-validation program.
-3. **Bench-calibrated noise floor** (factory-side): the factory
-   bench-calibration program characterizes the noise floor on the test bench; the results are
-   baked into the firmware's calibration array. On the user side,
-   nothing needs to be done beyond `setSensorClass()` +
-   `setCTModel()`. Until the program is complete, specific accuracy
-   figures at low currents are not published.
+   the pattern is a pilot, and figures for it are not published.
+3. **Factory-calibrated noise floor**: the module's calibration already takes
+   its noise floor into account. On the user side, nothing needs to be done
+   beyond `setSensorClass()` + `setCTModel()`. Specific accuracy figures at
+   low currents are not published.
 
 ## Production vs Factory mode (persistence reference)
 
@@ -431,17 +423,17 @@ The rbAmp module operates in two modes that differ in **what exactly is saved to
 
 In production mode, writes of factory calibration (`CMD_SAVE_GAINS`, `CMD_FACTORY_RESET`) are **rejected by the firmware** — this protects against accidentally overwriting the factory coefficients. Deploying factory mode is a manufacturer-side operation.
 
-> **Read-back ≠ persistence** (HW-verified A.7). The production guard accepts a write into RAM (a subsequent read returns what was written), but the flash save may be rejected. After a reboot the value **reverts**. **The only valid way to confirm persistence is to reboot the module via `CMD_RESET` and read again**:
+> **Read-back ≠ persistence.** The production guard accepts a write into RAM (a subsequent read returns what was written), but the flash save may be rejected. After a reboot the value **reverts**. **The only valid way to confirm persistence is to reboot the module via `CMD_RESET` and read again**:
 >
 > ```cpp
 > dev.setCTModel(code);
 > dev.reset();                     // CMD_RESET 0x01, works in production
-> delay(300);                      // boot complete (root canon)
+> delay(300);                      // boot complete
 > uint8_t check = dev.ctModel(0);
 > assert(check == code);           // ONLY now is persistence confirmed
 > ```
 >
-> ✅ **`REG_I2C_ADDRESS (0x30)` reads the ACTIVE address at boot** (v1.3 Fix 4 addr-boot-sync). After a post-commit reboot, reading 0x30 will show the new active address. The staging echo (after a host write) remains by-design until `CMD_COMMIT_ADDR` + reset.
+> ✅ **`REG_I2C_ADDRESS (0x30)` reads the ACTIVE address at boot** (v1.3). After a post-commit reboot, reading 0x30 will show the new active address. The staging echo (after a host write) remains by-design until `CMD_COMMIT_ADDR` + reset.
 
 Cross-link: [09 · API reference](09_api_reference.md) — details on specific opcodes, [10 · Troubleshooting](10_troubleshooting.md) — what to do if persistence is not confirmed.
 

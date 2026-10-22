@@ -19,7 +19,7 @@
  *       @c REG_V03_PERIOD_LATCH_MS (0xEC). The chip timer under-counts ~25-30 %
  *       under load (SysTick starvation, hardware-confirmed) and is diagnostic
  *       only. Future maintainers / sister-lib ports: do NOT revert energy to the
- *       chip latch_ms — it is a known billing regression. On a stale period the
+ *       chip latch_ms — it is a known energy-accounting regression. On a stale period the
  *       integration anchor is held (RbAmp::readPeriodSnapshot) so the next valid
  *       window covers the full elapsed interval.
  *

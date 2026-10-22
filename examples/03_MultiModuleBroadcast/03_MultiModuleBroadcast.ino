@@ -45,7 +45,7 @@ static RbAmp* modules[] = { &mod0, &mod1, &mod2 };
 static const uint8_t N_MODULES = sizeof(modules) / sizeof(modules[0]);
 
 static const uint8_t  GC_GROUP  = 0x00;      /* 0x00 = all-call (latch every module) */
-static const uint32_t WINDOW_MS = 60000UL;   /* 60 s billing window */
+static const uint32_t WINDOW_MS = 60000UL;   /* 60 s energy window */
 
 static uint32_t next_tick_ms = 0;
 static uint16_t g_tick       = 0;

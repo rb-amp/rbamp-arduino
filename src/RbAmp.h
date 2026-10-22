@@ -411,7 +411,7 @@ public:
      *
      * Otherwise writes REG_SENSOR_CLASS (0x25), issues CMD_SAVE_USER_CONFIG
      * (0x32) and waits 700 ms for the flash erase. Blocking. (SENSOR_CLASS is
-     * user_config; CMD_SAVE_GAINS is factory/develop-gated and a silent no-op
+     * user_config; CMD_SAVE_GAINS is factory-gated and a silent no-op
      * in production.)
      *
      * On v1.2+ firmware a set class is a precondition for setCTModel() —
@@ -479,7 +479,7 @@ public:
      *
      * Writes REG_CT_MODEL (0x05), binds channel 0, issues CMD_SAVE_USER_CONFIG
      * (0x32), waits 700 ms for flash erase. Blocking. (CT_MODEL is user_config;
-     * CMD_SAVE_GAINS is factory/develop-gated and a silent no-op in production.)
+     * CMD_SAVE_GAINS is factory-gated and a silent no-op in production.)
      *
      * v1.2+ firmware precondition: setSensorClass() MUST be called first,
      * otherwise this method returns false with @c RB_ERR_PARAM and does not
@@ -531,25 +531,16 @@ public:
      * channels 3+ (senior SKUs UI5/UI7) bind via the channel window field 15
      * (CT_MODEL), which requires v1.4.18+ firmware (fw ver 0x0A). Both paths end
      * with @c CMD_SAVE_USER_CONFIG for flash persistence (700 ms erase; CT_MODEL
-     * is user_config — SAVE_GAINS is dev-gated); the ch3+ path
+     * is user_config — SAVE_GAINS is factory-gated); the ch3+ path
      * additionally reads the applied model back and reports @c RB_ERR_PARAM if
      * the module rejected the code (it keeps its previous model). Blocking
      * ~705 ms per call.
      *
-     * @warning For channels 0-2, writing @c REG_CT_MODEL also triggers the
-     * device-side legacy direct-write callback which applies the preset to
-     * channel 0 unconditionally. So @c setCTModel(1, code) writes @c code to
-     * channel 1 AS INTENDED, but also clobbers channel 0 as a side-effect. To
-     * configure ch0-2 with different models, **call the higher channel indices
-     * FIRST**:
-     * @code
-     * dev.setCTModel(2, RBAMP_CT_SCT013_020);  // ch2  (also clobbers ch0)
-     * dev.setCTModel(1, RBAMP_CT_SCT013_030);  // ch1  (also clobbers ch0)
-     * dev.setCTModel(0, RBAMP_CT_SCT013_005);  // ch0  (final ch0 preset)
-     * @endcode
-     * Channels 3+ do NOT have this clobber side-effect (the window write targets
-     * exactly the selected channel). For a batched, order-safe configuration of
-     * all channels prefer @c configureChannels().
+     * @note On firmware 1.4.4+ (VERSION >= 0x05) and on most 0x04 modules the
+     * order of per-channel writes does not matter. Very early 1.2 modules
+     * overwrote channel 0 as a side effect of a channel 1-2 write; writing the
+     * higher channels first, or using @c configureChannels(), is safe on all
+     * of them. Verify the result with @c readCTModelCh().
      *
      * Requires @c firmwareVersion() >= 0x03 (v1.2); ch3+ requires >= 0x0A
      * (v1.4.18). Returns @c RB_ERR_VERSION on older firmware. Same

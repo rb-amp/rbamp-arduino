@@ -5,8 +5,7 @@
 ## What rbAmp is
 
 **rbAmp** is a compact hardware module for precision measurement of
-AC-mains parameters over the I²C interface. It is built on a
-Cortex-M0+ microcontroller with an integrated isolated analog
+AC-mains parameters over the I²C interface. It has an integrated isolated analog
 front-end and factory calibration stored in flash.
 
 From an integrator's point of view the module behaves as a standard
@@ -74,7 +73,7 @@ that same handle directly — the fleet API is not needed.
 > measure **current only** — they have no voltage, no active power,
 > and no PF. Active energy (Wh) and power are computed **only on
 > UI-variants** (which have a voltage front-end). In the canonical
-> deployment the "mains-meter" role (billing energy) is played by a
+> deployment the "mains-meter" role (tariff/period metering) is played by a
 > single **UI1** on the mains feed; the sub-meter role (per-load
 > current detail) is played by **I2**/**I3** modules.
 
@@ -112,10 +111,10 @@ isolated.
 | `VCC` | **+5 V (4.5..5.5 V)**, current ~15 mA, peak ~25 mA. On-board regulator and filtering |
 | `GND` | common with the master (**mandatory**) |
 | `SDA`, `SCL` | I²C, **3.3 V logic, 5 V-tolerant**. Built-in 4.7 kΩ pull-ups to 3.3 V |
-| `DRDY` | optional, open-drain LOW for ~10 µs every ~200 ms |
+| `DRDY` | optional, open-drain LOW for ~10 µs every ~100 ms |
 
 The default address is `0x50` (7-bit, change range `0x08..0x77`), at
-100 kHz (Standard) or 400 kHz (Fast). Cold start until the first valid
+100 kHz (UNO / Mega / STM32 / RP2040) or 50 kHz (ESP32 / ESP8266); do not use 400 kHz. Cold start until the first valid
 measurement is ~250 ms.
 
 The full rules (bus length, pull-up recommendations on a multi-module
@@ -124,15 +123,15 @@ bus, wiring schemes with different hosts) are in chapter
 
 ## Module tiers (quick cheat sheet)
 
-The current rbAmp firmware implements only the **BASIC** tier —
-one-way (consumption-only) metering following the logic of a classic
-mechanical meter:
+The **BASIC** tier implements one-way (consumption-only) metering following
+the logic of a classic mechanical meter; the **STANDARD (STD)** line is a
+second shipping module line with signed (import / export) energy:
 
 | Tier | RT power `P` | Per-period accumulator `PERIOD_AVG_P_W` | Library Wh counter |
 |---|---|---|---|
-| **BASIC** | signed (negative = export to the grid, visible in real time) | every **200 ms window** of average P is clamped to `max(P, 0)` before being added to the period accumulator | **monotonic** — meters consumption only |
-| **STANDARD** | *planned* | *planned* — separate export accumulator | *planned* — bidirectional metering |
-| **PRO** | *planned* | *planned* + diagnostics | *planned* + additional counters |
+| **BASIC** | signed (negative = export to the grid, visible in real time) | every **100 ms window** of average P is clamped to `max(P, 0)` before being added to the period accumulator | **monotonic** — meters consumption only |
+| **STANDARD (STD)** | signed | import and export accounted separately (latch banks, or the module's persisted life-time counters) | net energy = import − export (`wh_net`, `stdReadEnergy()`) |
+| **PRO** | not implemented | not implemented | not implemented |
 
 Details are in chapter [02 · Module tiers](02_tiers.md). At the library
 level the same `RbAmp` class is used regardless of tier; the
@@ -141,7 +140,7 @@ differences show up in the values the module returns.
 > **Bidirectional metering on BASIC**: the library's
 > `dev.energy().wh(ch)` on the BASIC tier gives consumption only. If
 > you need to account for export separately, sample the RT power
-> `dev.readPower(0)` at ~5 Hz and split the positive and negative
+> `dev.readPower(0)` at ~10 Hz and split the positive and negative
 > samples into two accumulator variables yourself. An example is in
 > [06_examples.md](06_examples.md) (the BidirectionalEnergy scenario).
 
@@ -286,7 +285,7 @@ For all the typical tasks in the first rows the library is the right fit.
                        ▼
 ┌─────────────────────────────────────────────────────┐
 │  rbAmp module at address 0x50                       │
-│   • Measurement pipeline U / I / P / PF (~200 ms)   │
+│   • Measurement pipeline U / I / P / PF (~100 ms)   │
 │   • Period accumulator (atomic CMD_LATCH_PERIOD)    │
 └─────────────────────────────────────────────────────┘
 ```
@@ -346,8 +345,8 @@ sketch        RbAmp                Wire                rbAmp module
   │◄────true────┤                    │                       │
 ```
 
-The atomic latch on the module side guarantees that every ADC
-micro-sample within the period lands in exactly one snapshot — no
+The atomic latch on the module side guarantees that every
+measurement within the period lands in exactly one snapshot — no
 duplication, no losses at the period boundary.
 
 ## Mapping to the direct register API
