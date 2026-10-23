@@ -127,20 +127,22 @@ The external values are recommended values (calculated from the I²C specificati
 
 ### Bus length
 
-I²C is a short bus (~30 cm by default). Validated topologies for
+I²C is a short bus (~15 cm by default). Many users connect modules with low-quality jumper wires, which pick up a lot of noise and lose many transfers — hence the short limit. Recommended topologies for
 rbAmp:
 
 | Cable | Max length | Speed |
 |---|---|---|
-| Standard JST / flat 4-conductor | up to 0.3 m | 100 kHz |
+| Standard JST / flat 4-conductor | up to 0.15 m | 100 kHz |
 | Twisted pair UTP (cat-5/5e/6) — SDA+GND and SCL+GND in **separate pairs** | up to 1 m | 100 kHz |
 | Twisted pair + I²C buffer (PCA9515 / TCA9617) | up to 3 m | 100 kHz |
 | Differential bus (PCA9615 / LTC4332) | up to 100 m | 100 kHz |
 
-> For lengths over 0.3 m, **twisted pair is mandatory**: SDA and SCL must
+> For lengths over 0.15 m, **twisted pair is mandatory**: SDA and SCL must
 > be in **different** pairs, each with its own ground (for example, blue +
 > blue-white for SDA, green + green-white for SCL). SDA and SCL in
 > a single pair create cross-coupled capacitance that distorts the edges.
+
+> ⚠ **Inside an electrical cabinet, shield the I2C cable.** Strong magnetic fields near mains conductors, contactors and transformers induce noise in an unshielded cable. Keep the cable as short as possible and away from the mains wiring.
 
 ## Mains-side wiring (sensors)
 
@@ -155,6 +157,8 @@ matters** for the sign of active power:
   the grid into the load), `P < 0` means **export** to the grid (generation).
 - Swapped (L and N reversed): the sign of P inverts — consumption is
   counted as negative power.
+
+**Wire and fuse.** A thick wire is not required for the voltage connection: AWG26–22 is enough, because the voltage sensor draws very little current. A fuse in the L line is **mandatory**, rated up to 0.1 A.
 
 Correct polarity is critical for:
 
