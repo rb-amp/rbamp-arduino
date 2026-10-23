@@ -70,7 +70,7 @@ For details, see chapter **06 · Examples**, scenario 1
 | Peak current I_peak | float32, A | depends on the selected sensor |
 | Active power P (signed in RT) | float32, W | depends on the selected sensor |
 | Power factor PF | float32 | −1…+1 |
-| Grid frequency | uint8, Hz | 45…65 Hz |
+| Grid frequency | uint8, Hz | 50 / 60 Hz (detected) |
 | Period-averaged P | float32, W | as for P |
 
 > **The RT value of active power `P` is always signed on any module
