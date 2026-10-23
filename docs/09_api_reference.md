@@ -79,6 +79,8 @@ The constructor generates no I²C traffic.
 
 #### `bool begin() noexcept`
 
+> **Native protocol:** [02 · Initialization and Start-up (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#02--initialization-and-start-up) · [BASIC or STD? (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#basic-or-std) · [Continuous polling cycle (recommended) (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#continuous-polling-cycle-recommended)
+
 Probe the device, detect its product line and variant, prime the snapshot.
 
 Sequence:
@@ -120,6 +122,8 @@ version (neither `0` nor `0xFF`).
 
 #### `bool waitReady(uint32_t timeout_ms = 1000) noexcept`
 
+> **Native protocol:** [02 · Initialization and Start-up (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#02--initialization-and-start-up) · [3. `DATA_VALID` (`0xCE`) never becomes 1 (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#3-data_valid-0xce-never-becomes-1) · [4 · Register map (production v1.3) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#4--register-map-production-v13)
+
 Polls the module's ready flag until bit 0 is set. Useful after
 power-on — the module may need up to one measurement window (100 ms) to
 commit its first data.
@@ -136,6 +140,8 @@ firmware reports higher values. `0` or `0xFF` indicate an I²C error
 
 #### `RbAmpLine line() const noexcept`
 
+> **Native protocol:** [BASIC or STD? (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#basic-or-std)
+
 **Returns**: the product line detected by `begin()` — `RbAmpLine::Basic`
 (the value until `begin()` has run) or `RbAmpLine::Std`. No bus access.
 
@@ -145,11 +151,15 @@ firmware reports higher values. `0` or `0xFF` indicate an I²C error
 
 #### `uint8_t channels() const noexcept`
 
+> **Native protocol:** [Multi-channel current (UI2 / UI3 / UI5 / UI7) (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#multi-channel-current-ui2--ui3--ui5--ui7) · [4.10 V03 real-time block (0x86..0xBD) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#410-v03-real-time-block-0x860xbd) · [4.14 Channel access window (`0x32` + `0x3C..0x3F`) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#414-channel-access-window-0x32--0x3c0x3f)
+
 **Returns**: the number of current channels, `1..RBAMP_MAX_CHANNELS` (7).
 On the STD line the count is what the module reports, capped at
 `RBAMP_MAX_CHANNELS`.
 
 #### `bool hasVoltageHw() const noexcept`
+
+> **Native protocol:** [3.2 `CAPABILITY` (regs `0x57/0x58`, u16 LE, read-only) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#32-capability-regs-0x570x58-u16-le-read-only)
 
 **Returns**: `true` if a voltage sensor was detected at `begin()`.
 Cached, no traffic.
@@ -196,6 +206,8 @@ Peak voltage over the RT window. Same `phase` rule.
 
 #### `float readCurrent(uint8_t ch = 0) noexcept`
 
+> **Native protocol:** [Multi-channel current (UI2 / UI3 / UI5 / UI7) (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#multi-channel-current-ui2--ui3--ui5--ui7) · [4.14 Channel access window (`0x32` + `0x3C..0x3F`) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#414-channel-access-window-0x32--0x3c0x3f)
+
 Instantaneous RMS current on a channel. `ch` must be < `channels()`
 — otherwise `NAN` with `RB_ERR_PARAM`. This includes any channel at or
 beyond `RBAMP_MAX_CHANNELS` (7).
@@ -205,6 +217,8 @@ beyond `RBAMP_MAX_CHANNELS` (7).
 Peak current on a channel over the RT window.
 
 #### `float readPower(uint8_t ch = 0) noexcept`
+
+> **Native protocol:** [RT register reference (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#rt-register-reference) · [Bidirectional accounting (STANDARD (STD)) (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#bidirectional-accounting-standard-std)
 
 Instantaneous active power on a channel. **Signed** — a negative
 value means export (the load feeds power back into the grid, relevant
@@ -230,6 +244,8 @@ Grid frequency, in Hz.
 
 #### `bool readAll(RbAmpSnapshot& out) noexcept`
 
+> **Native protocol:** [RT register reference (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#rt-register-reference) · [Polling — single module (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#polling--single-module) · [4.10 V03 real-time block (0x86..0xBD) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#410-v03-real-time-block-0x860xbd)
+
 The complete RT block in a single call, into a `RbAmpSnapshot`
 struct. Equivalent to sequential `readVoltage()` + `readVoltagePeak()`
 + `readCurrent(0..N)` + `readCurrentPeak(0..N)` + `readPower(0..N)` +
@@ -250,6 +266,8 @@ See [01 · Overview](01_overview.md) for the big picture and
 
 #### `bool latchPeriod() noexcept`
 
+> **Native protocol:** [04 · Period Metering and Tariff Accounting (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#04--period-metering-and-tariff-accounting)
+
 Writes `CMD_LATCH_PERIOD` (0x27) to `REG_COMMAND`. Does not wait —
 the caller itself must observe the 50 ms settle and check
 `isPeriodValid()` before reading.
@@ -261,19 +279,27 @@ entire sequence.
 
 #### `bool isPeriodValid() noexcept`
 
+> **Native protocol:** [04 · Period Metering and Tariff Accounting (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#04--period-metering-and-tariff-accounting) · [Calibration and accuracy (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#calibration-and-accuracy) · [7.5 Failed-snapshot period preservation (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#75-failed-snapshot-period-preservation)
+
 Reads the snapshot ready bit. `true` if the last snapshot is fresh and
 ready to read.
 
 #### `float readPeriodAvgPower(uint8_t ch = 0) noexcept`
+
+> **Native protocol:** [Period snapshot registers (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#period-snapshot-registers) · [4.11 V03 period block (0xBE..0xCF) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#411-v03-period-block-0xbe0xcf) · [4.12 V03 Q + period ch0 (0xD0..0xE3, production build) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#412-v03-q--period-ch0-0xd00xe3-production-build)
 
 Average active power on a channel over the closed period. Must be
 called after `latchPeriod()` + 50 ms settle + valid check.
 
 #### `float readPeriodMaxPower() noexcept`
 
+> **Native protocol:** [Period snapshot registers (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#period-snapshot-registers) · [4.12 V03 Q + period ch0 (0xD0..0xE3, production build) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#412-v03-q--period-ch0-0xd00xe3-production-build)
+
 Peak instantaneous power on channel 0 over the closed period.
 
 #### `uint32_t readPeriodLatchMs() noexcept`
+
+> **Native protocol:** [13. Multi-module clock drift in long tests (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#13-multi-module-clock-drift-in-long-tests) · [4.13 Diagnostic chip-side dt (0xEC) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#413-diagnostic-chip-side-dt-0xec)
 
 Period duration from the **device's** point of view, in ms.
 
@@ -281,6 +307,8 @@ Period duration from the **device's** point of view, in ms.
 > for energy — use the master clock (`master_dt_ms` from `RbAmpPeriodSnapshot`).
 
 #### `bool readPeriodSnapshot(RbAmpPeriodSnapshot& out, uint16_t settle_ms = 50, bool skip_latch = false) noexcept`
+
+> **Native protocol:** [Continuous polling cycle (recommended) (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#continuous-polling-cycle-recommended) · [Multi-module — simultaneous snapshot (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#multi-module--simultaneous-snapshot) · [Calibration and accuracy (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#calibration-and-accuracy)
 
 **The recommended entry point** for period metering. The full
 sequence under the hood:
@@ -327,6 +355,8 @@ class" section below.
 
 #### `double energyWh(uint8_t ch = 0) const noexcept`
 
+> **Native protocol:** [Master-side algorithm (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#master-side-algorithm) · [7 · Semantics (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#7--semantics)
+
 The running energy total of a channel, like `energy().wh(ch)` — except on
 an STD module that keeps persisted counters but publishes no per-channel split
 (more than one channel, older register map): a per-channel request returns
@@ -363,6 +393,8 @@ For a detailed model-selection guide see [03 · Current sensor selection](03_sen
 
 #### `bool setSensorClass(RbAmpSensorClass cls) noexcept`
 
+> **Native protocol:** [Setting the sensor class and CT model (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#setting-the-sensor-class-and-ct-model) · [4.3 System (0x20..0x25) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#43-system-0x200x25) · [6.2 CT model binding — pure staging + per-channel CMD (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#62-ct-model-binding--pure-staging--per-channel-cmd)
+
 Set the current sensor class with a save to flash.
 
 Sequence: read the module's current class (read-before-write) → write
@@ -386,6 +418,8 @@ read-before-write rules apply.
 `BuiltinCT`.
 
 #### `bool readSensorClass(uint8_t& out) noexcept`
+
+> **Native protocol:** [4.3 System (0x20..0x25) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#43-system-0x200x25)
 
 Reads the module's current sensor class (an `RbAmpSensorClass` value;
 `0` = unset). Works on both lines.
@@ -429,6 +463,8 @@ backward compatibility; new code passes a generated `RBAMP_CT_*` define to the
 `uint8_t` form, which is the only way to name a wired-CT model.
 
 #### `bool setCTModel(uint8_t channel, uint8_t code) noexcept`
+
+> **Native protocol:** [Setting the sensor class and CT model (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#setting-the-sensor-class-and-ct-model) · [6.2 CT model binding — pure staging + per-channel CMD (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#62-ct-model-binding--pure-staging--per-channel-cmd)
 
 The per-channel form. Sets the CT clamp model on a specific channel,
 `0 .. channels()-1` (channels 3 and up are the senior-SKU channels; they need
@@ -485,6 +521,8 @@ with a calibration. A code absent from the registry is still rejected
 **Returns**: `true` on success.
 
 #### `bool readCTModelCh(uint8_t channel, uint8_t& out) noexcept`
+
+> **Native protocol:** [4.7 CT model verify mirrors (0x51..0x53) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#47-ct-model-verify-mirrors-0x510x53) · [8.10 CT model verify-mirror read-back (post-binding sanity) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#810-ct-model-verify-mirror-read-back-post-binding-sanity)
 
 Reads the CT model actually applied to a channel (the verify mirror of the
 bound preset). Use it to confirm that a bind took. `out = 0` means unset.
@@ -600,6 +638,8 @@ once after 5 s.
 
 #### `bool prepareAddressChange(uint8_t new_addr) noexcept`
 
+> **Native protocol:** [Address change (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#address-change) · [4.5 Address (0x30..0x31) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#45-address-0x300x31) · [6.1 Address change — two-phase commit (production-OK) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#61-address-change--two-phase-commit-production-ok)
+
 Step 1 of 2 for changing the module's I²C address. **Production-OK** on the current firmware (v1.3 two-phase commit, no factory-mode gating for the address).
 
 Sequence: validate the `new_addr` range (0x08..0x77, ≠ current) → write the candidate to `REG_I2C_ADDRESS (0x30)` in RAM → write magic `0xA5` to `REG_ADDR_COMMIT_MAGIC (0x31)` — armed. The caller must call `commitAddressChange()` within 5 seconds, otherwise the arming expires.
@@ -607,6 +647,8 @@ Sequence: validate the `new_addr` range (0x08..0x77, ≠ current) → write the 
 **Returns**: `true` if armed successfully.
 
 #### `bool commitAddressChange() noexcept`
+
+> **Native protocol:** [Address change (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#address-change) · [6.1 Address change — two-phase commit (production-OK) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#61-address-change--two-phase-commit-production-ok) · [8.5 Address change 5-step (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#85-address-change-5-step)
 
 Step 2 of 2. Must be called within 5 seconds of `prepareAddressChange()`.
 
@@ -725,12 +767,16 @@ dev.setLogStream(&Serial);
 
 #### `uint32_t retryExhaustionCount() const noexcept`
 
+> **Native protocol:** [05 · Troubleshooting (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#05--troubleshooting)
+
 How many times since power-on (or the last `resetCounters()`) the
 retry loop was exhausted during a single-byte read. The steady-state
 value is **0**. A non-zero value is a sign of link problems (see
 [10 · Troubleshooting](10_troubleshooting.md)).
 
 #### `uint32_t sanityRejectCount() const noexcept`
+
+> **Native protocol:** [05 · Troubleshooting (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#05--troubleshooting)
 
 How many raw float values were rejected by the sanity filter
 (`!isfinite(x) || |x| > 10000`). Steady-state — **0**. A non-zero
@@ -766,6 +812,8 @@ the configuration to flash).
 
 ### `RbAmpVariant readVariant() noexcept`
 
+> **Native protocol:** [Module variant auto-detection (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#module-variant-auto-detection) · [rbAmp Wire-Protocol Reference (v1.3) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#rbamp-wire-protocol-reference-v13) · [3.6 Canonical detection algorithm (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#36-canonical-detection-algorithm)
+
 Reads the module's `HW_VARIANT (0x55)` register and returns an
 `RbAmpVariant`:
 
@@ -789,6 +837,8 @@ Reads the module's `HW_VARIANT (0x55)` register and returns an
 
 ### `bool readCapability(uint16_t& out) noexcept` — BASIC only
 
+> **Native protocol:** [Module variant auto-detection (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#module-variant-auto-detection) · [3.2 `CAPABILITY` (regs `0x57/0x58`, u16 LE, read-only) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#32-capability-regs-0x570x58-u16-le-read-only) · [8 · Wire-trace examples (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#8--wire-trace-examples)
+
 Reads the module's 16-bit feature map. Branch on the named capability
 constants of `RbAmpRegistersV2.h` (namespace `rbamp::v2`), never on
 firmware-version heuristics. Among other things the map says whether the
@@ -799,6 +849,8 @@ broadcast snapshot (see `broadcastLatch()`). On an STD instance the call returns
 
 ### `uint8_t readProductId() noexcept`
 
+> **Native protocol:** [3.5 `PRODUCT_ID` (`0x54`, u8, read-only) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#35-product_id-0x54-u8-read-only) · [4.8 Identity (0x54..0x6F) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#48-identity-0x540x6f)
+
 Reads `PRODUCT_ID (0x54)` — the byte identifier of the family
 (rbAmp sensor = `0x01`, rbDimmer = `0x02`; `0` on failure). Used by the
 fleet scanner to confirm that the device at an address really is an rbAmp
@@ -806,6 +858,8 @@ and not some other I²C slave that happened to respond at the same address.
 An STD instance reports the sensor family.
 
 ### `bool readUid(uint8_t uid[12]) noexcept`
+
+> **Native protocol:** [4.8 Identity (0x54..0x6F) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#48-identity-0x540x6f)
 
 Reads the 96-bit unique MCU identifier from `UID (0x5C..0x67)` in a
 single burst operation. The UID is guaranteed unique for every
@@ -815,11 +869,15 @@ replaced in a deployed fleet. Works on both lines.
 
 ### `bool readLabel(char out[9]) noexcept` — BASIC only
 
+> **Native protocol:** [8.3 Multi-byte WRITE — `LABEL` byte-at-a-time (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#83-multi-byte-write--label-byte-at-a-time)
+
 Reads the 8-byte user label from `LABEL (0x68..0x6F)`. ASCII,
 zero-padded; the result is always null-terminated (a 9-byte array =
 8 data bytes + the terminating `\0`). An empty label = unset.
 
 ### `bool writeLabel(const char* label) noexcept` — BASIC only
+
+> **Native protocol:** [8.3 Multi-byte WRITE — `LABEL` byte-at-a-time (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#83-multi-byte-write--label-byte-at-a-time)
 
 Writes the 8-byte label. Accepts a null-terminated string — extra
 bytes are truncated, missing ones are padded with zeros. The write
@@ -835,6 +893,8 @@ need `dev.saveUserConfig()` so the label survives a reset.
 > Do not abort provisioning on the first sight of `0xFB`.
 
 ### `bool saveUserConfig() noexcept`
+
+> **Native protocol:** [6.5 Provisioning — fresh-flash + SAVE (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#65-provisioning--fresh-flash--save) · [8.6 Fresh-flash provisioning (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#86-fresh-flash-provisioning)
 
 Issues `CMD_SAVE_USER_CONFIG (opcode 0x32)` — saves the user-config
 block to flash: `SENSOR_CLASS`, `CT_MODEL` per channel,
@@ -940,6 +1000,8 @@ write between them.
 
 ### `uint8_t readLastError() noexcept`
 
+> **Native protocol:** [3. `DATA_VALID` (`0xCE`) never becomes 1 (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#3-data_valid-0xce-never-becomes-1) · [Error codes (`REG_ERROR` = `0x02`) (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#error-codes-reg_error--0x02) · [4 · Register map (production v1.3) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#4--register-map-production-v13)
+
 Reads the device's `REG_ERROR (0x02)` register directly (a single
 wire read; returns `0x00` for OK, `0xFA..0xFF` for an error class, and `0xFF`
 if the I²C read itself failed) — the outcome of the **last transaction successfully
@@ -956,11 +1018,15 @@ the command verdict is already mapped to `lastError()` (see the
 
 ### `bool hasError(bool& out) noexcept`
 
+> **Native protocol:** [5 · Wire protocol (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#5--wire-protocol)
+
 A convenience helper over `EVENT_FLAGS.bit3`. Returns `true` in `out`
 if bit3 is set. Sticky W1C; not cleared until an explicit clear (with
 a caveat — see the "Clearing a durable error" section above).
 
 ### `bool readEventFlags(uint8_t& out) noexcept` / `bool clearEventFlags(uint8_t mask) noexcept`
+
+> **Native protocol:** [8.8 Threshold event flow — write threshold → trigger → W1C clear (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#88-threshold-event-flow--write-threshold--trigger--w1c-clear)
 
 `EVENT_FLAGS (0x2A)` — a byte of sticky flags; the specific bits are
 described in the specification (including `ERROR_OCCURRED` bit3).
@@ -968,6 +1034,8 @@ Clear is write-1-to-clear: write a mask with ones in the bits you
 want to reset.
 
 ### `bool clearError() noexcept`
+
+> **Native protocol:** [Error codes (`REG_ERROR` = `0x02`) (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#error-codes-reg_error--0x02) · [6.7 Error-state recovery — decision tree (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#67-error-state-recovery--decision-tree)
 
 Issues `CMD_CLEAR_ERROR (opcode 0x31)` — zeros `REG_ERROR`.
 **Required to clear a durable error** paired with
@@ -981,6 +1049,8 @@ On multi-channel modules each current channel has its own CT sensor model.
 The atomic utility for bulk configuration is `configureChannels()`.
 
 ### `bool configureChannels(RbAmpSensorClass cls, const uint8_t* models, uint8_t n) noexcept`
+
+> **Native protocol:** [8.6 Fresh-flash provisioning (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#86-fresh-flash-provisioning)
 
 Parameters:
 - `cls` — the sensor class, applied first. With `RbAmpSensorClass::Sct013`
@@ -1035,6 +1105,8 @@ Hardware details — [04 · Wiring](04_hardware.md#data_ready-drdy).
 
 #### `bool setDrdyPin(int pin) noexcept`
 
+> **Native protocol:** [01 · Hardware Connection (hardware-connection)](https://github.com/rb-amp/rbamp-docs/blob/main/hardware-connection.md#01--hardware-connection) · [03 · Real-Time Polling (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#03--real-time-polling)
+
 Attach the `DRDY` line of this module (or detach with `pin < 0`). Configures
 the pin as an input with the internal pull-up and a falling-edge interrupt;
 the ISR only counts and time-stamps the edge — no bus traffic there. Up to 4
@@ -1044,6 +1116,8 @@ support the data-ready contract refuses with `RB_ERR_NOT_IMPLEMENTED`;
 polls as well.
 
 #### `bool waitDataReady(uint32_t timeout_ms, RbAmpDrdyEvent* ev = nullptr) noexcept`
+
+> **Native protocol:** [01 · Hardware Connection (hardware-connection)](https://github.com/rb-amp/rbamp-docs/blob/main/hardware-connection.md#01--hardware-connection) · [03 · Real-Time Polling (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#03--real-time-polling)
 
 Block until this module publishes a new snapshot (or an alarm), at most
 `timeout_ms` (`0` = one non-blocking check).
@@ -1062,6 +1136,8 @@ nothing arrived, `RB_ERR_NOT_IMPLEMENTED` on an STD module whose image has no
 publish counter.
 
 #### `bool readAllReady(uint32_t timeout_ms, RbAmpSnapshot& out, RbAmpDrdyEvent* ev = nullptr) noexcept`
+
+> **Native protocol:** [Polling — single module (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#polling--single-module)
 
 `waitDataReady()` followed by `readAll()`, so the whole read lands inside one
 publish window: the snapshot is never read twice and never straddles a
@@ -1085,6 +1161,8 @@ Read / set which event bits hold `DRDY` LOW (`rbamp::v2::EVENT_*` bits).
 re-apply it after a module reset (`EVENT_RESET_OCCURRED` tells you).
 
 #### `bool setEventThresholds(float i_amps, float p_watts) noexcept`
+
+> **Native protocol:** [4.4 Fleet config (0x27..0x2F) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#44-fleet-config-0x270x2f) · [8.8 Threshold event flow — write threshold → trigger → W1C clear (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#88-threshold-event-flow--write-threshold--trigger--w1c-clear)
 
 Set the current / power thresholds behind `EVENT_THRESH_I` /
 `EVENT_THRESH_P`; a value `<= 0` disables that threshold. RAM on the module.
@@ -1389,6 +1467,8 @@ they are monotonic with a signed import / export split.
 
 #### `bool stdReadEnergy(RbAmpStdEnergy& out) noexcept`
 
+> **Native protocol:** [Bidirectional accounting (STANDARD (STD)) (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#bidirectional-accounting-standard-std)
+
 Read the module's life-time counters. Each block is read in one transaction,
 so a 64-bit counter cannot tear across a publish.
 
@@ -1659,6 +1739,8 @@ are **invalid**.
 
 ### Discovery — `scan()`
 
+> **Native protocol:** [Multi-module setup (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#multi-module-setup) · [Multi-module polling — three strategies (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#multi-module-polling--three-strategies) · [Multi-module issues (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#multi-module-issues)
+
 ```cpp
 bool scan(bool match_product, size_t& added);
 ```
@@ -1699,6 +1781,8 @@ excluded). `add` lets you manually add a handle created separately
 (for example, after manual provisioning).
 
 ### Polling — `pollAll()`
+
+> **Native protocol:** [Multi-module setup (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#multi-module-setup) · [Multi-module polling — three strategies (realtime-polling)](https://github.com/rb-amp/rbamp-docs/blob/main/realtime-polling.md#multi-module-polling--three-strategies)
 
 ```cpp
 bool pollAll(RbAmpSnapshot* snaps,
@@ -1743,6 +1827,8 @@ the poll.
 
 ### Addressing and conflict checking
 
+> **Native protocol:** [Multi-module issues (troubleshooting)](https://github.com/rb-amp/rbamp-docs/blob/main/troubleshooting.md#multi-module-issues)
+
 ```cpp
 bool assignAddress(RbAmp* dev, uint8_t new_addr);
 bool checkConflict(uint8_t addr, bool& collision) noexcept;
@@ -1762,6 +1848,8 @@ addresses, iterate over the fleet:
 guarantee** catching identical modules — see provisioning discipline.
 
 ### Provisioning — `provision()` (static)
+
+> **Native protocol:** [6.5 Provisioning — fresh-flash + SAVE (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#65-provisioning--fresh-flash--save)
 
 ```cpp
 static bool provision(TwoWire& bus,
@@ -1795,6 +1883,8 @@ the specified address. Internally:
 > provisioning fail" section.
 
 ### Fleet GC sync — synchronous snapshots across the whole fleet
+
+> **Native protocol:** [General Call (broadcast at address 0x00) (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#general-call-broadcast-at-address-0x00) · [Multi-module — simultaneous snapshot (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#multi-module--simultaneous-snapshot) · [6.3 GC broadcast snapshot — opt-in fleet sync (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#63-gc-broadcast-snapshot--opt-in-fleet-sync)
 
 ```cpp
 bool enableGcAll(uint8_t group, size_t& ok_count);
@@ -1840,6 +1930,8 @@ adding it to a fleet, or want fine-grained control.
 
 ### `bool enableGc(bool enable) noexcept` / `bool readFleetConfig(uint8_t& out) noexcept`
 
+> **Native protocol:** [General Call (broadcast at address 0x00) (initialization)](https://github.com/rb-amp/rbamp-docs/blob/main/initialization.md#general-call-broadcast-at-address-0x00) · [4.4 Fleet config (0x27..0x2F) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#44-fleet-config-0x270x2f)
+
 `enableGc(true)` writes `1` to `FLEET_CONFIG.bit0 (0x27)` + saves to
 flash + reset — the module will start accepting GC snapshots after
 boot. `enableGc(false)` clears the bit symmetrically. **Blocks for
@@ -1868,6 +1960,8 @@ created, or if you want manual control over the tick counter.
 
 ### `bool readActiveAddress(uint8_t& out) noexcept`
 
+> **Native protocol:** [4.5 Address (0x30..0x31) (api-reference)](https://github.com/rb-amp/rbamp-docs/blob/main/api-reference.md#45-address-0x300x31)
+
 Reads `REG_I2C_ADDRESS (0x30)` — the module's active (running)
 address. On v1.3, at boot it reads the **active** address, not a
 staged candidate. On the STD line it returns the persisted address field
@@ -1880,6 +1974,8 @@ A per-channel Wh accumulator. Owned by `RbAmp`, accessed via
 `dev.energy()`. The user normally does not create it directly.
 
 ### Public methods
+
+> **Native protocol:** [Master-side algorithm (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#master-side-algorithm)
 
 ```cpp
 double wh(uint8_t ch = 0) const noexcept;
@@ -1984,6 +2080,8 @@ struct RbAmpSnapshot {
 `RBAMP_FIELD_POWER`, `RBAMP_FIELD_PF`, `RBAMP_FIELD_FREQUENCY`.
 
 ### `RbAmpPeriodSnapshot`
+
+> **Native protocol:** [Detecting a module restart (period-metering)](https://github.com/rb-amp/rbamp-docs/blob/main/period-metering.md#detecting-a-module-restart)
 
 Returned by `readPeriodSnapshot()`. The energy-metering primitive.
 
