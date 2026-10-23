@@ -153,7 +153,7 @@ current.
    current. The full table is in
    [03 · Current sensor selection](03_sensor_selection.md).
 
-   If you have a multi-channel module (UI2 / UI3) and you want to see
+   If you have a multi-channel module (UI2 / UI3 / UI5 / UI7) and you want to see
    both small loads and peak surges, consider the **dual-CT pattern**:
    a small clamp (for example, SCT-013-005) on a dedicated channel for
    the low range + a large one (SCT-013-030/100) on another channel
