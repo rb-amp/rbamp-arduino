@@ -71,8 +71,8 @@ enum class RbAmpVariant : uint8_t {
     I3      = 6,   /**< 3 current only. */
     UI5     = 7,   /**< 5 current + voltage + power (senior SKU). */
     UI7     = 8,   /**< 7 current + voltage + power (senior SKU). */
-    U3I3    = 9,   /**< STD line: 3 voltage + 3 current (three-phase meter). */
-    U3I6    = 10,  /**< STD line: 3 voltage + 6 current. */
+    ThreePh3Ch = 9,   /**< STD line: 3 voltage + 3 current (three-phase meter). */
+    ThreePh6Ch = 10,  /**< STD line: 3 voltage + 6 current. */
 };
 
 /**

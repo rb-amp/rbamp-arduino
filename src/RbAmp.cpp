@@ -2635,8 +2635,8 @@ RbAmpVariant RbAmp::stdVariantMap(uint8_t v) noexcept {
         case rbamp_std::VARIANT_I1:   return RbAmpVariant::I1;
         case rbamp_std::VARIANT_I2:   return RbAmpVariant::I2;
         case rbamp_std::VARIANT_I3:   return RbAmpVariant::I3;
-        case rbamp_std::VARIANT_U3I3: return RbAmpVariant::U3I3;
-        case rbamp_std::VARIANT_U3I6: return RbAmpVariant::U3I6;
+        case rbamp_std::VARIANT_3PH_3CH: return RbAmpVariant::ThreePh3Ch;
+        case rbamp_std::VARIANT_3PH_6CH: return RbAmpVariant::ThreePh6Ch;
         default:                      return RbAmpVariant::Unknown;
     }
 }
