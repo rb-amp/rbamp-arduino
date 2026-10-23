@@ -111,7 +111,7 @@ What else:
 | Word | Meaning |
 |---|---|
 | Period | The time between two energy readings that you take (for example 60 s). |
-| Latch | A command that makes the module freeze its running average for the period so you can read it. |
+| Snapshot | A command that makes the module freeze its running average for the period so you can read it. |
 | Window | One 100 ms measurement slot of the module; real-time values refresh once per window. |
 | BASIC / STD | The two module lines. Check the label on your module; `dev.line()` prints it after `begin()`. |
 | DRDY | Optional "data ready" output pin; it pulses LOW when fresh values are published. |
@@ -152,7 +152,7 @@ Ready sketches in [`examples/`](examples/):
 8. [`08_FleetSync`](examples/08_FleetSync/) — scan a fleet, General-Call period sync, fleet-wide aggregation
 9. [`09_SeniorSku`](examples/09_SeniorSku/) — 5- and 7-channel modules through the same per-channel calls
 10. [`10_PerChannelModels`](examples/10_PerChannelModels/) — a different current sensor on every channel
-11. [`11_StdLine`](examples/11_StdLine/) — one sketch for both product lines; STD extras (Q / S, health, latch banks)
+11. [`11_StdLine`](examples/11_StdLine/) — one sketch for both product lines; STD extras (Q / S, health, snapshot banks)
 
 Each sketch is walked through in detail in [docs/06_examples.md](docs/06_examples.md). A bench-only validation harness lives in [`extras/`](extras/) (not a Library-Manager example).
 

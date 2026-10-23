@@ -109,7 +109,7 @@ second shipping module line with signed (import / export) energy:
 | Tier | RT power `P` | Per-period accumulator `PERIOD_AVG_P_W` | Library Wh counter |
 |---|---|---|---|
 | **BASIC** | signed (negative = export to the grid, visible in real time) | every **100 ms window** of average P is clamped to `max(P, 0)` before being added to the period accumulator | **monotonic** — meters consumption only |
-| **STANDARD (STD)** | signed | import and export accounted separately (latch banks, or the module's persisted life-time counters) | net energy = import − export (`wh_net`, `stdReadEnergy()`) |
+| **STANDARD (STD)** | signed | import and export accounted separately (snapshot banks, or the module's persisted life-time counters) | net energy = import − export (`wh_net`, `stdReadEnergy()`) |
 | **PRO** | not implemented | not implemented | not implemented |
 
 Details are in chapter [02 · Module tiers](02_tiers.md). At the library
@@ -192,7 +192,7 @@ if (dev.readPeriodSnapshot(snap)) {
 Internally the library guarantees:
 
 - A 50 ms settling time after `CMD_LATCH_PERIOD`, and a correct read
-  of the snapshot (atomic latch on the module side).
+  of the snapshot (atomic snapshot on the module side).
 - A check of the `PERIOD_VALID` flag before reading.
 - Recording the time against the master's clock even on a stale
   snapshot (protects against double-counting Wh on the next period).
@@ -222,9 +222,9 @@ For all the typical tasks in the first rows the library is the right fit.
 
 ### The `begin()` flow
 
-![Sequence of begin(): version read, line detection, primer latch (discarded), then ready.](images/arduino-begin-flow.png)
+![Sequence of begin(): version read, line detection, primer snapshot (discarded), then ready.](images/arduino-begin-flow.png)
 
-The first latch is a primer (the module returns what it has
+The first snapshot is a primer (the module returns what it has
 accumulated since power-on, which is unsuitable for tariff metering).
 The library records on its own that this snapshot must be discarded —
 the user code never sees this.
@@ -233,7 +233,7 @@ the user code never sees this.
 
 ![Sequence of readPeriodSnapshot(): the library closes the period on the module, reads the snapshot, integrates energy on the master clock and returns the result to the sketch.](images/arduino-snapshot-flow.png)
 
-The atomic latch on the module side guarantees that every
+The atomic snapshot on the module side guarantees that every
 measurement within the period lands in exactly one snapshot — no
 duplication, no losses at the period boundary.
 

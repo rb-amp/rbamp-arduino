@@ -2,7 +2,7 @@
 
 ![Register map of the module: the page-0 address space 0x00 to 0xFF.](images/api-register-map.png)
 
-![Atomic period latch: one write closes the current period and opens the next.](images/period-atomic-latch.png)
+![Atomic period snapshot: one write closes the current period and opens the next.](images/period-atomic-latch.png)
 
 The public API of the `RbAmp` library for Arduino as of v1.6.1. One class
 serves both module product lines — **BASIC** and **STANDARD (STD)**:
@@ -79,12 +79,12 @@ The constructor generates no I²C traffic.
 
 #### `bool begin() noexcept`
 
-Probe the device, detect its product line and variant, prime LATCH.
+Probe the device, detect its product line and variant, prime the snapshot.
 
 Sequence:
 
 1. **STD identity probe first.** If the module answers as an STD module, the
-   channel counts come from the module itself, latch bank 0 is armed and
+   channel counts come from the module itself, snapshot bank 0 is armed and
    primed, and `begin()` returns — the BASIC steps below are skipped.
 2. Read `REG_VERSION` (0x03). If the device did not ACK — `false`
    with `RB_ERR_NACK`. If it returned `0x00` / `0xFF` — `false` with
@@ -261,17 +261,17 @@ entire sequence.
 
 #### `bool isPeriodValid() noexcept`
 
-Reads the latch ready bit. `true` if the last snapshot is fresh and
+Reads the snapshot ready bit. `true` if the last snapshot is fresh and
 ready to read.
 
 #### `float readPeriodAvgPower(uint8_t ch = 0) noexcept`
 
-Average active power on a channel over the latched period. Must be
+Average active power on a channel over the closed period. Must be
 called after `latchPeriod()` + 50 ms settle + valid check.
 
 #### `float readPeriodMaxPower() noexcept`
 
-Peak instantaneous power on channel 0 over the latched period.
+Peak instantaneous power on channel 0 over the closed period.
 
 #### `uint32_t readPeriodLatchMs() noexcept`
 
@@ -285,13 +285,13 @@ Period duration from the **device's** point of view, in ms.
 **The recommended entry point** for period metering. The full
 sequence under the hood:
 
-1. If `skip_latch == true` — skip the LATCH write (applies after
-   `broadcastLatch()` or a manual series of LATCH commands).
+1. If `skip_latch == true` — skip the snapshot command write (applies after
+   `broadcastLatch()` or a manual series of snapshot commands).
 2. Otherwise — write `CMD_LATCH_PERIOD`.
 3. Capture `millis()` to compute `master_dt_ms`.
 4. `delay(settle_ms)` — 50 ms by default per the protocol
    specification.
-5. Check the latch ready flag. If 0 — set `RB_ERR_STALE` and record
+5. Check the snapshot ready flag. If 0 — set `RB_ERR_STALE` and record
    the timestamp (so the next snapshot does not double-count by
    `dt`).
 6. Read `avg_p[0..channels-1]` + `max_p` + `latch_ms`.
@@ -301,16 +301,16 @@ sequence under the hood:
 | Parameter | Description |
 |---|---|
 | `out` | Output struct. |
-| `settle_ms` | Wait after LATCH, 50 by default. |
-| `skip_latch` | If `true` — do not write LATCH, only read (for a synchronized multi-board scene). |
+| `settle_ms` | Wait after the snapshot command, 50 by default. |
+| `skip_latch` | If `true` — do not send the snapshot command, only read (for a synchronized multi-board scene). |
 
 **Returns**: `true` if `out.valid == true`; `false` if the read
 failed or the snapshot is stale.
 
-On the STD line the settle after a latch is raised to at least 300 ms (the
-module services the latch at its next measurement-window boundary), `latch_ms`
+On the STD line the settle after a snapshot is raised to at least 300 ms (the
+module services the snapshot at its next measurement-window boundary), `latch_ms`
 is `0` and `master_dt_ms` is the period. On an STD module that keeps persisted
-life-time counters instead of latch banks, the period is the difference of two
+life-time counters instead of snapshot banks, the period is the difference of two
 counter readings on the master's schedule; `avg_p_total`, `wh_net` and
 `module_restarted` of the snapshot are filled there.
 
@@ -677,18 +677,18 @@ re-arms the period path.
 
 #### `static bool broadcastLatch(TwoWire& bus) noexcept`
 
-Sends an I²C General-Call broadcast latch (`A5 27 00 tick_lo tick_hi`
-to address `0x00`) — all modules with GC enabled latch the period
+Sends an I²C General-Call broadcast snapshot (`A5 27 00 tick_lo tick_hi`
+to address `0x00`) — all modules with GC enabled take the period snapshot
 simultaneously. On v1.3 firmware GC is supported as an **opt-in
 capability**: per-module enable via `REG_FLEET_CONFIG.bit0` (cleared by
 default); the module's capability map says whether it supports the
-General-Call latch. General-Call is a BASIC-line feature (the General-Call
+General-Call snapshot. General-Call is a BASIC-line feature (the General-Call
 and label helpers return `RB_ERR_NOT_IMPLEMENTED` on an STD instance).
 
 **Return semantics**:
 
 - **v1.3 firmware, GC enabled on at least one module** — returns `true`,
-  the fleet latches in sync (skew < 1 ms across modules).
+  the fleet takes its snapshot in sync (skew < 1 ms across modules).
 - **v1.3 firmware, GC disabled on all modules** — `Wire.endTransmission()`
   to `0x00` NACKs at the bus level → returns `false`. Fix: enable GC
   per module via `enableGc(true)` (writes `FLEET_CONFIG.bit0` +
@@ -794,7 +794,7 @@ constants of `RbAmpRegistersV2.h` (namespace `rbamp::v2`), never on
 firmware-version heuristics. Among other things the map says whether the
 module has a voltage front-end — if not, it does not compute P / PF / energy
 and those values read `0` — and whether it supports the General-Call
-broadcast latch (see `broadcastLatch()`). On an STD instance the call returns
+broadcast snapshot (see `broadcastLatch()`). On an STD instance the call returns
 `false` with `RB_ERR_NOT_IMPLEMENTED`; use `stdInfo()` there.
 
 ### `uint8_t readProductId() noexcept`
@@ -1134,8 +1134,8 @@ if (dev.readAllReady(500, snap, &ev)) {
 The feature summaries below were moved here from the README.
 
 - **Current-sensor configuration** — `setSensorClass(class)` picks the family (SCT-013 fitted by you; wired / built-in CT modules ship calibrated with their sensor and are not reconfigured), then `setCTModel(code)` — or `configureChannels(class, models[], n)` for a multi-channel module in one call. The setters read before they write: a class or model the module already holds costs no bus write and no flash cycle, so re-applying a stored configuration on every boot is safe. The SCT-013 accepted code set is `{1=005A, 2=010A, 3=030A, 4=050A, 5=100A, 6=020A, 7=060A}`. Calibration coefficients load automatically from the factory preset table. BASIC modules up to firmware 1.4.19 are calibrated on the SCT-013-030: when you select another SCT-013 model the library restarts the module after the save and from then on scales current and power readings relative to the gain the module applies (see `sctRating()`); power factor and voltage are not affected, and a module that reports the self-correction capability bit (firmware 1.4.20+) needs none.
-- **`RbAmpFleet` manager** — for several modules on one bus: `scan()` discovers and adopts them (with collision detection), `pollAll()` reads them in one pass, `totalPower()` / `totalEnergyWh()` aggregate, and the General-Call path (`enableGcAll()` → `gcLatch(tick)` → `checkSync()`) latches every module's period simultaneously with per-module missed-frame detection. `provision()` / `assignAddress()` bring factory-fresh modules onto the bus at distinct addresses.
-- **Both product lines, one API** — `begin()` detects whether a module speaks the BASIC (8-bit) or the STD (16-bit, fixed-point) register model and routes every call internally; `line()` tells you which. On an STD module the same `readVoltage(phase)` / `readCurrent(ch)` / `readPower(ch)` / `readPeriodSnapshot()` calls work, channel counts come from the module (three-phase modules are just N > 1), and the STD-only extras are exposed as `readReactivePower(ch)` / `readApparentPower(ch)`, `stdReadChannel(ch)` (one burst: I / P / Q / S / PF / peak / signed energy / harmonics), `stdReadVoltage(v)`, `stdReadHealth()`, and eight master-timed latch banks (`stdArmBanks()` → `stdLatch(bank)` → `stdReadLatch(bank)` → `stdLatchWh()`). Modules that keep persisted life-time counters instead of latch banks are served by the same `readPeriodSnapshot()` / `energy()` calls (a period is the difference of two counter readings; `stdReadEnergy()` gives the raw counters), plus the module clock (`stdSetTime()`), history and event log (`stdHistRead()`, `stdEventRead()`), identity (`stdIdentify()`, `RbAmp::stdProbe()`), commissioning by UID (`RbAmp::stdSetAddressByUid()`) and firmware update over I2C (`stdOtaWritePreparedImage()`, images prepared on the manufacturer's build host). Every command waits for the module to report it finished before the verdict is read, and multi-byte blocks are read in one transaction so counters never tear. Modules that publish micro-resolution counters fill the `*_uwh` / `*_uvarh` fields of `RbAmpStdEnergy` (`fine == true`; derived from the coarse counters elsewhere, so the fields are always usable), accept a starting current below which a channel counts no energy (`stdSetEnergyStartCurrent()`), and report voltage phase angles (`angle_deg` in `stdReadVoltage()`) and the phase sequence (`stdReadPhaseSequence()`). If your sketch persists `RbAmpStdEnergy` (NVS, EEPROM, file), store the individual fields you need in your own fixed format, not the struct as a raw blob — the structure gains fields across library versions and an old blob will not match the new size.
+- **`RbAmpFleet` manager** — for several modules on one bus: `scan()` discovers and adopts them (with collision detection), `pollAll()` reads them in one pass, `totalPower()` / `totalEnergyWh()` aggregate, and the General-Call path (`enableGcAll()` → `gcLatch(tick)` → `checkSync()`) takes every module's period snapshot simultaneously with per-module missed-frame detection. `provision()` / `assignAddress()` bring factory-fresh modules onto the bus at distinct addresses.
+- **Both product lines, one API** — `begin()` detects whether a module speaks the BASIC (8-bit) or the STD (16-bit, fixed-point) register model and routes every call internally; `line()` tells you which. On an STD module the same `readVoltage(phase)` / `readCurrent(ch)` / `readPower(ch)` / `readPeriodSnapshot()` calls work, channel counts come from the module (three-phase modules are just N > 1), and the STD-only extras are exposed as `readReactivePower(ch)` / `readApparentPower(ch)`, `stdReadChannel(ch)` (one burst: I / P / Q / S / PF / peak / signed energy / harmonics), `stdReadVoltage(v)`, `stdReadHealth()`, and eight master-timed snapshot banks (`stdArmBanks()` → `stdLatch(bank)` → `stdReadLatch(bank)` → `stdLatchWh()`). Modules that keep persisted life-time counters instead of snapshot banks are served by the same `readPeriodSnapshot()` / `energy()` calls (a period is the difference of two counter readings; `stdReadEnergy()` gives the raw counters), plus the module clock (`stdSetTime()`), history and event log (`stdHistRead()`, `stdEventRead()`), identity (`stdIdentify()`, `RbAmp::stdProbe()`), commissioning by UID (`RbAmp::stdSetAddressByUid()`) and firmware update over I2C (`stdOtaWritePreparedImage()`, images prepared on the manufacturer's build host). Every command waits for the module to report it finished before the verdict is read, and multi-byte blocks are read in one transaction so counters never tear. Modules that publish micro-resolution counters fill the `*_uwh` / `*_uvarh` fields of `RbAmpStdEnergy` (`fine == true`; derived from the coarse counters elsewhere, so the fields are always usable), accept a starting current below which a channel counts no energy (`stdSetEnergyStartCurrent()`), and report voltage phase angles (`angle_deg` in `stdReadVoltage()`) and the phase sequence (`stdReadPhaseSequence()`). If your sketch persists `RbAmpStdEnergy` (NVS, EEPROM, file), store the individual fields you need in your own fixed format, not the struct as a raw blob — the structure gains fields across library versions and an old blob will not match the new size.
 - **Data-ready line and events** — `setDrdyPin(pin)` listens to the module's DRDY output; `waitDataReady()` / `readAllReady()` return right after the module publishes a new snapshot (several modules may share one line), and a module holding the line signals a masked event (`setEventMask()`, `setEventThresholds()`) that the wait reads and clears for you. Without a line the same calls poll.
 
 ## STD line API
@@ -1191,8 +1191,8 @@ struct RbAmpStdInfo {
 };
 ```
 
-`RbAmpStdPeriodSource`: `Latch` (the module has latch banks; bank 0 serves
-`readPeriodSnapshot()`), `Counters` (no latch banks, but persisted life-time
+`RbAmpStdPeriodSource`: `Latch` (the module has snapshot banks; bank 0 serves
+`readPeriodSnapshot()`), `Counters` (no snapshot banks, but persisted life-time
 energy counters — a period is the difference of two counter readings; the bank
 calls refuse without bus traffic) or `None` (the period / energy calls fail
 with `RB_ERR_NOT_IMPLEMENTED`).
@@ -1268,7 +1268,7 @@ struct RbAmpStdChannel {
 ```
 
 For monitoring, integrate `p` yourself or use `stdReadEnergy()`; the raw
-accumulators exist for the latch-bank path.
+accumulators exist for the snapshot-bank path.
 
 #### `bool stdReadVoltage(uint8_t v, RbAmpStdVoltage& out) noexcept`
 
@@ -1324,14 +1324,14 @@ Fields marked "image-dependent" or documented for newer register maps read `0`
 unit calibrated on an older image until `saveGains()` has run once; the
 readings themselves are unaffected.
 
-### Period latch banks
+### Period snapshot banks
 
-The STD module that has latch banks keeps eight independent, master-timed
+The STD module that has snapshot banks keeps eight independent, master-timed
 periods. Typical use: arm the banks you need once; then per bank, on your own
 schedule: `stdLatch(bank)` → wait at least 300 ms → `stdReadLatch(bank, snap)`
 → `stdLatchWh(snap, dt, ...)` with the master-measured `dt` since the previous
-latch of that bank. Bank 0 is also what `readPeriodSnapshot()` and `energy()`
-use. On a module without latch banks (`period_source == Counters`) these calls
+snapshot of that bank. Bank 0 is also what `readPeriodSnapshot()` and `energy()`
+use. On a module without snapshot banks (`period_source == Counters`) these calls
 refuse with `RB_ERR_NOT_IMPLEMENTED`.
 
 #### `bool stdArmBanks(uint8_t mask) noexcept`
@@ -1352,10 +1352,10 @@ Does not wait; read it at least 300 ms later.
 Read the last snapshot of `bank` in one burst (totals + per-channel energy of
 every populated channel).
 
-**Returns**: `false` with `RB_ERR_STALE` if the module has never latched this
+**Returns**: `false` with `RB_ERR_STALE` if the module has never taken a snapshot of this
 bank (`out.valid == false`), or if the snapshot is empty (`win_count == 0`)
 because the bank lost its arm after a module reset. In the latter case the
-library re-arms and primer-latches the bank: drop this period and restart
+library re-arms and takes a primer snapshot of the bank: drop this period and restart
 your own `dt` anchor (the outage interval carries no data).
 
 ```cpp
@@ -1367,7 +1367,7 @@ struct RbAmpStdLatch {
     uint32_t nsamp;                  // conversion divisor used by stdLatchWh()
     uint32_t win_count;              // measurement windows in the period (0 = not armed / nothing elapsed)
     uint8_t  channels, bank;
-    bool     valid;                  // the bank has EVER been latched (not a freshness signal)
+    bool     valid;                  // the bank has EVER been snapshotted (not a freshness signal)
     float    p_avg_ch[RBAMP_MAX_CHANNELS];
     int64_t  e_import_ch_mws[RBAMP_MAX_CHANNELS], e_export_ch_mws[RBAMP_MAX_CHANNELS];
 };
@@ -1376,7 +1376,7 @@ struct RbAmpStdLatch {
 #### `static bool stdLatchWh(const RbAmpStdLatch& snap, uint32_t dt_ms, uint8_t ch, double& wh_import, double& wh_export) noexcept`
 
 Convert a snapshot's raw energy accumulators to Wh over the master-measured
-period `dt_ms` (wall clock between the previous and this latch of the bank).
+period `dt_ms` (wall clock between the previous and this snapshot of the bank).
 `ch` is a channel index, or `RBAMP_STD_TOTAL` for the bank totals. `wh_import`
 is `>= 0`, `wh_export` is `<= 0`.
 
@@ -1641,7 +1641,7 @@ typedef void (*RbAmpOtaProgress)(uint32_t done, uint32_t total, void* ctx);
 The `RbAmpFleet` class is the main high-level surface of the v1.3
 library. It manages a collection of modules on a shared I²C bus:
 discovery, provisioning, poll aggregation, error aggregation, and
-synchronous latches via General-Call broadcast.
+synchronous snapshots via General-Call broadcast.
 
 One fleet is bound to one `TwoWire` bus (usually `Wire`); each
 adopted module is an owned `RbAmp` handle. The soft cap on the number
@@ -1806,7 +1806,7 @@ bool checkSync(uint16_t expected_tick,
 ```
 
 For tight snapshot synchronization across the
-whole fleet an I²C General-Call broadcast latch is used.
+whole fleet an I²C General-Call broadcast snapshot is used.
 
 1. `enableGcAll` sets `FLEET_CONFIG.bit0` + `GROUP_ID` on all fleet
    modules and issues `CMD_SAVE_USER_CONFIG` on each (persistent). A
@@ -1815,7 +1815,7 @@ whole fleet an I²C General-Call broadcast latch is used.
    enable succeeded.
 2. `gcLatch` sends the GC frame `A5 27 group tick_lo tick_hi` to
    address `0x00` — all modules with GC enabled and a matching
-   `group` instantly perform `LATCH_PERIOD`. `settle_ms` is the pause
+   `group` instantly perform the snapshot command (`LATCH_PERIOD`). `settle_ms` is the pause
    after the frame (typically 50 ms) before verification.
 3. `checkSync` reads `GC_TICK (0x59)` on each module into
    `RbAmpFleetSync status[status_cap]`. The per-module result:
@@ -1841,7 +1841,7 @@ adding it to a fleet, or want fine-grained control.
 ### `bool enableGc(bool enable) noexcept` / `bool readFleetConfig(uint8_t& out) noexcept`
 
 `enableGc(true)` writes `1` to `FLEET_CONFIG.bit0 (0x27)` + saves to
-flash + reset — the module will start accepting GC latches after
+flash + reset — the module will start accepting GC snapshots after
 boot. `enableGc(false)` clears the bit symmetrically. **Blocks for
 ~1 second** (SAVE_USER_CONFIG settle + reset settle). `readFleetConfig`
 returns the current config byte — useful for read-back confirmation.
@@ -1992,8 +1992,8 @@ struct RbAmpPeriodSnapshot {
     float avg_p[RBAMP_MAX_CHANNELS]; // W — average active power over the period
     float max_p;                     // W — peak instantaneous power on channel 0
     uint32_t latch_ms;               // ms — period duration (device's view, diagnostic; 0 on STD)
-    uint32_t master_dt_ms;           // ms — master wall-clock dt since the last latch
-    bool valid;                      // true if the latch ready flag was set
+    uint32_t master_dt_ms;           // ms — master wall-clock dt since the last snapshot
+    bool valid;                      // true if the snapshot ready flag was set
     float avg_p_total;               // W — average active power over the period, all channels
     double wh_net;                   // Wh — net energy of this period (import − export)
     bool module_restarted;           // the module restarted inside this period (STD counter path only)
@@ -2184,7 +2184,7 @@ The authoritative SKU byte is `REG_HW_VARIANT (0x55)` (the
 `REG_TOPOLOGY (0x24)` is auxiliary (only the channel count, it does not distinguish the presence of U). On the STD line the library reads the identity from the module's own 16-bit map during `begin()` and maps the variant into `readVariant()`.
 
 
-### General-Call broadcast latch (multi-module synchronization)
+### General-Call broadcast snapshot (multi-module synchronization)
 
 **Opt-in per-module** via `REG_FLEET_CONFIG.bit0` — `GC_ENABLE`. **Default OFF**. Enabled via `CMD_SAVE_USER_CONFIG` + `CMD_RESET` (soft or hard). After reset the module listens for a broadcast frame at addr `0x00`:
 
@@ -2196,12 +2196,12 @@ addr=0x00 | A5 27 <group> <tick_lo> <tick_hi>
 - `<group>` — `0x00` = all-call, otherwise it must match `REG_GROUP_ID (0x28)`.
 - `<tick_lo/hi>` — the 16-bit master-sync period counter.
 
-The frame only latches; destructive opcodes are not transmitted over GC.
+The frame only takes the snapshot; destructive opcodes are not transmitted over GC.
 
 **Failure mode detection (two-tier)**:
 
 1. **GC-address NACK** (immediately at the bus level): if GC is disabled on the **whole fleet** — `Wire.endTransmission()` to `0x00` returns a non-zero code (NACK). This is a **hard error, not a silent drop**. The lib treats it as "GC not enabled" (requires the enable+reset preconditions).
-2. **Per-module witness** (after settle): if no NACK occurred — read `REG_V03_PERIOD_VALID (0x07)` on each expected module. `1`=latch succeeded; `0`=GC disabled on this module or the period is empty; `!=1` → fall back to a per-device latch.
+2. **Per-module witness** (after settle): if no NACK occurred — read `REG_V03_PERIOD_VALID (0x07)` on each expected module. `1`=snapshot succeeded; `0`=GC disabled on this module or the period is empty; `!=1` → fall back to a per-device latch.
 
 ## References
 

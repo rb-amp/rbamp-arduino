@@ -281,7 +281,7 @@ unresponsive or the master is polling too often.
 
 ### Cadence check procedure
 
-1. **Check the cadence:** 60 s between latches is comfortable; 30 s is
+1. **Check the cadence:** 60 s between snapshots is comfortable; 30 s is
    marginal; < 10 s guarantees stales.
 2. **Check the module's responsiveness** between snapshots:
 
@@ -317,7 +317,7 @@ reference meter (Kill-A-Watt and the like).
    cadence (see above).
 3. **Master clock drift:** `millis()` by itself is reliable. But if
    the master enters deep-sleep without preserving the RTC, the
-   interval between the previous and the next latch is lost. Enable the
+   interval between the previous and the next snapshot is lost. Enable the
    RTC for such scenarios.
 
 ### Accumulator precision by platform
@@ -355,8 +355,8 @@ NOT zero its internal `_last_latch_ms` anchor. The next valid read
 gets a `master_dt` equal to the **full** interval since the previous
 successful snapshot — that is, it covers both the "lost" stale period
 and the current one. The firmware preserves the `avg_p` accumulator
-across an empty latch (firmware-side persistence): on the next valid
-latch this is already the value averaged over the whole interval. The
+across an empty snapshot (firmware-side persistence): on the next valid
+snapshot this is already the value averaged over the whole interval. The
 Wh integration **stays accurate** — no double-count, no under-count.
 
 No special stale handling is needed in the master's code: the library
@@ -564,8 +564,8 @@ tells you which line you have. Things specific to STD:
 - **Voltage angle / phase sequence stay "not available" on a recent image** —
   they need all voltage inputs energised and measurable, and a three-voltage
   module for the phase sequence.
-- **Period snapshots/latch reads come back empty (`RB_ERR_STALE`) after a
-  module restart** — expected: the latch arm lives in the module's RAM. The
+- **Period snapshot reads come back empty (`RB_ERR_STALE`) after a
+  module restart** — expected: the snapshot arm lives in the module's RAM. The
   library re-arms the bank and drops that one period; restart your own `dt`
   anchor. Wait at least 300 ms between `stdLatch()` and `stdReadLatch()`.
 - **No history records** — the module records history only while its clock is

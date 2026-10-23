@@ -111,8 +111,8 @@ same common API as BASIC (see [04 · Wiring](04_hardware.md)).
 
 ### What the STD line adds
 
-On an STD module with persisted counters, the period/latch API and energy come
-from the module's own counters (older STD images use the module's latch
+On an STD module with persisted counters, the period/snapshot API and energy come
+from the module's own counters (older STD images use the module's snapshot
 banks); the CT model on STD is a label only and sets no gain.
 
 - **Signed energy**: import and export are accounted separately. On modules

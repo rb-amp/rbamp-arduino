@@ -247,7 +247,7 @@ void setup() {
 
     // Raise the pull-up + attach the ISR AFTER dev.begin() — this
     // guarantees the module is already ready and the pull-up edge will not
-    // cause a spurious interrupt before the first RT window is latched.
+    // cause a spurious interrupt before the first RT window is captured.
     // INPUT_PULLUP is fine for most cases; for long
     // lines or AVR hosts add an external 10 kΩ to 3.3 V.
     pinMode(PIN_DRDY, INPUT_PULLUP);
@@ -599,17 +599,17 @@ At 50 kHz, one read transaction ≈ 200-400 µs. A full RT block of one channel 
 
 ### Period sync
 
-![Period sync across modules: sequential latch with a small stagger versus one General-Call frame at address 0x00.](images/period-broadcast-latch.png)
+![Period sync across modules: sequential snapshot with a small stagger versus one General-Call frame at address 0x00.](images/period-broadcast-latch.png)
 
-For tariff metering, all modules must latch **the same** interval. Two strategies:
+For tariff metering, all modules must take their snapshot over **the same** interval. Two strategies:
 
-**Strategy 1 — sequential latch + common settle** (any firmware):
+**Strategy 1 — sequential snapshot + common settle** (any firmware):
 
 ```cpp
 RbAmp meters[N];   // array of initialized modules
 
 void period_cycle() {
-    // Phase 1: sequential latch
+    // Phase 1: sequential snapshot
     for (auto& m : meters) m.latchPeriod();
 
     // Phase 2: common settle (≥ 50 ms)
@@ -623,11 +623,11 @@ void period_cycle() {
 }
 ```
 
-Skew between modules: 16 modules × ~1 ms/latch = ~16 ms across a 60-s period. Negligible for energy totals.
+Skew between modules: 16 modules × ~1 ms/snapshot = ~16 ms across a 60-s period. Negligible for energy totals.
 
-**Strategy 2 — General-Call broadcast latch** (requires enable):
+**Strategy 2 — General-Call broadcast snapshot** (requires enable):
 
-All modules latch with a single I²C frame on addr `0x00`:
+All modules take their snapshot with a single I²C frame on addr `0x00`:
 
 ```
 addr=0x00 | A5 27 <group> <tick_lo> <tick_hi>   (5 bytes)
@@ -648,8 +648,8 @@ Which to use:
 
 `REG_GROUP_ID (0x28)` lets you have several GC domains on one bus:
 
-- `group = 0x00` → all-call (all modules with GC enabled latch).
-- `group = N` → only modules with `REG_GROUP_ID = N` latch.
+- `group = 0x00` → all-call (all modules with GC enabled take a snapshot).
+- `group = N` → only modules with `REG_GROUP_ID = N` take a snapshot.
 
 Use case — separating tariff groups (day vs night) on one shared bus.
 
@@ -660,11 +660,11 @@ Use case — separating tariff groups (day vs night) on one shared bus.
 | `i2c bus scan` shows several modules at one address after a field add | A new module at `0x50` conflicts with an already-addressed one | Re-address the new module **separately** before adding it |
 | One module NACKs more often than the others | Cable fault / VCC drop | Check VCC under load |
 | One module's Wh consistently diverges | The module's own clock differs from the master's | Energy is integrated on the master clock; compare with `master_dt_ms`, not `latch_ms` |
-| After a GC frame, one module does not latch | `FLEET_CONFIG.bit0 = 0` or group mismatch | Check `REG_FLEET_CONFIG` and `REG_GROUP_ID` |
+| After a GC frame, one module does not take a snapshot | `FLEET_CONFIG.bit0 = 0` or group mismatch | Check `REG_FLEET_CONFIG` and `REG_GROUP_ID` |
 
 ### Bus design notes
 
-- **Clock stretching**: the module's latch pauses it only for microseconds; SCL is not stretched significantly. For the Raspberry Pi BCM283x (known hw bug in stretching): the standard precaution is 50 kHz + retry.
+- **Clock stretching**: the module's snapshot pauses it only for microseconds; SCL is not stretched significantly. For the Raspberry Pi BCM283x (known hw bug in stretching): the standard precaution is 50 kHz + retry.
 - **Length with >4 modules**: consider an I²C buffer (PCA9515) at ≥ 8 modules + length > 1 m.
 
 Detailed multi-module scenarios — in [06 · Examples](06_examples.md).

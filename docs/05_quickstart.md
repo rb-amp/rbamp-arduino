@@ -273,12 +273,12 @@ void loop() {
 
 What `readPeriodSnapshot()` does under the hood:
 
-1. Sends the module a period-latch command.
+1. Sends the module a period-snapshot command.
 2. Waits 50 ms while the module prepares the snapshot.
 3. Checks the ready flag; reads the average/peak power.
 4. Updates the internal Wh counter: `+= avg_p × master_dt_s / 3600`.
 
-`begin()` already performs a first latch that the library discards. The
+`begin()` already performs a first snapshot that the library discards. The
 first `readPeriodSnapshot()` in your sketch therefore covers only the
 time since `begin()` (a few seconds, see `dt=` in the output): ignore that
 first line and wait for a full period. From the second call on, each line

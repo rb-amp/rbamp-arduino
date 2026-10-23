@@ -76,7 +76,7 @@ transactions (13 floats × 4 bytes + 1 byte frequency). At 100 kHz with
 
 Wh counter refreshed once per minute on a 128×64 SSD1306 OLED sharing the
 I2C bus (OLED at 0x3C). Key library mechanic: `readPeriodSnapshot()` does
-latch + settle + valid-check + read + Wh tick in one call.
+snapshot + settle + valid-check + read + Wh tick in one call.
 
 ```cpp
 #include <Wire.h>
@@ -134,14 +134,14 @@ Three rbAmp modules on one bus at 0x50 / 0x51 / 0x52. Each must have a
 unique I2C address — use [scenario 10](#scenario-10--i2c-address-change)
 to assign addresses during installation.
 
-> **v1.3 coherent latch:** every module that supports the General-Call latch and has opted into
-> the General-Call latch (`enableGc(true)`, persisted) captures the *same*
+> **v1.3 coherent snapshot:** every module that supports the General-Call snapshot and has opted into
+> the General-Call snapshot (`enableGc(true)`, persisted) captures the *same*
 > mains period on a single all-call frame —
 > `RbAmp::broadcastLatchGroup(Wire, 0x00, tick)`. Fleet skew is < 10 µs, so
 > per-module powers sum coherently. Each module tags its snapshot with the
 > broadcast `tick`; read it back with `readGcTick()` to catch a module that
-> missed the frame. (On v1.0/v1.1 firmware, General-Call latch was
-> unavailable and this sketch fell back to per-device sequential latching —
+> missed the frame. (On v1.0/v1.1 firmware, General-Call snapshot was
+> unavailable and this sketch fell back to per-device sequential snapshots —
 > kept in the file's history comment for older modules.)
 
 ```cpp
@@ -161,7 +161,7 @@ void setup() {
     Wire.setClock(50000);   // 50 kHz on ESP32 / 100 kHz on non-ESP32 masters
     for (uint8_t i = 0; i < N; ++i) {
         modules[i]->begin();
-        modules[i]->enableGc(true);   // opt into General-Call latch (persisted)
+        modules[i]->enableGc(true);   // opt into General-Call snapshot (persisted)
     }
 }
 
@@ -342,7 +342,7 @@ void loop() {
     delay(60000);
 
     static uint16_t g_tick = 0;
-    RbAmp::broadcastLatchGroup(Wire, /*group=*/0x00, ++g_tick);  // coherent all-call latch
+    RbAmp::broadcastLatchGroup(Wire, /*group=*/0x00, ++g_tick);  // coherent all-call snapshot
     delay(50);
 
     RbAmpPeriodSnapshot sm, ss, sl;
@@ -489,7 +489,7 @@ leave 12-15 h unattended. Acceptance: `retry_exhaust == 0`,
 
 ## Scenario 9 — Battery deep-sleep logger
 
-ESP32 wakes every 10 minutes, latches one period, publishes via WiFi+MQTT,
+ESP32 wakes every 10 minutes, takes one period snapshot, publishes via WiFi+MQTT,
 deep-sleeps. Energy persists across sleep via RTC memory. Library
 accumulator is **disabled** — master owns Wh persistence.
 
@@ -619,7 +619,7 @@ sketch serves BASIC and STANDARD (STD) modules. `begin()` detects the line;
 the common read calls (`readVoltage()`, `readCurrent()`, `readPower()`,
 `readPowerFactor()`, `readFrequency()`) work on either, and the STD-only
 extras — reactive and apparent power, per-channel block reads
-(`stdReadChannel()`), health counters (`stdReadHealth()`) and the period latch
+(`stdReadChannel()`), health counters (`stdReadHealth()`) and the period snapshot
 banks — sit behind a `line()` check:
 
 ```cpp
@@ -667,7 +667,7 @@ call-by-call description is in
 
 - [API Reference](https://www.rbamp.com/docs/modules-basic-standard-api-reference) — formal I²C register / command / error spec the library wraps
 - [Arduino Examples (raw I²C)](https://www.rbamp.com/docs/modules-basic-standard-arduino-examples) — same scenarios without the library, useful for porting
-- [Period Metering](https://www.rbamp.com/docs/modules-basic-standard-period-metering) — atomic latch concept and master-side energy formula
+- [Period Metering](https://www.rbamp.com/docs/modules-basic-standard-period-metering) — atomic period snapshot concept and master-side energy formula
 - [Hardware Connection](https://www.rbamp.com/docs/modules-basic-standard-hardware-connection) — pinout, wiring, CT installation
 - [Troubleshooting](https://www.rbamp.com/docs/modules-basic-standard-troubleshooting) — module-side issues (NACK, calibration drift, bus noise)
 
