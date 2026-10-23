@@ -12,6 +12,8 @@ SCT-013 by range) live in the neighboring chapters:
 - [03 · Current Sensor Selection](03_sensor_selection.md) — which
   SCT-013 model to pick and why
 
+![First reading in eight steps: wire, power on, scan for 0x50, begin(), optional sensor setup, read U, I, P, PF, sanity check, then energy.](images/first-reading-flow.png)
+
 ## What You'll Need
 
 - An rbAmp module (any tier, UI1 for simplicity)
@@ -71,6 +73,8 @@ The SCT-013 clamp snaps around the **line conductor (L) only**, with the
 arrow on the clamp body pointing **in the direction of current toward
 the load**. For more detail (the "Current sensor" section) see chapter
 [04 · Wiring](04_hardware.md).
+
+![Mains-side connection: the CT clamp on the L wire only with the arrow toward the load, and the L/N voltage reference tap.](images/mains-ct-connection.png)
 
 ## Step 3 — First Sketch (RT reading)
 

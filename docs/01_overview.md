@@ -1,6 +1,6 @@
 # 01 · Overview
 
-![rbAmp signal chain: sensor → module → I²C → master → cloud / Home Assistant](images/overview-architecture.png)
+![Signal chain from the current clamp through the rbAmp module and I²C to the master and on to cloud or Home Assistant.](images/overview-architecture.png)
 
 ## What rbAmp is
 
@@ -37,28 +37,7 @@ that same handle directly — the fleet API is not needed.
 
 ## The 80% scenario — mains + N sub-loads
 
-```text
-                            ┌──────────────────────────┐
-                            │   ESP32/Arduino (master) │
-                            │   RbAmpFleet fleet(Wire) │
-                            └──┬─────────┬─────────┬───┘
-                               │   I²C (shared bus)
-        ┌──────────────────────┘         │         │
-        │                                │         │
-   ┌────▼─────┐                    ┌─────▼─────┐   │
-   │ rbAmp #1 │                    │ rbAmp #2  │   │
-   │ MAINS    │                    │ Boiler    │   │
-   │ 0x50     │                    │ 0x51      │   │
-   └──────────┘                    └───────────┘   │
-        │ (on the feed)            (load 1)        │
-                                                   │
-                                             ┌─────▼─────┐
-                                             │ rbAmp #3  │
-                                             │ A/C       │
-                                             │ 0x52      │
-                                             └───────────┘
-                                            (load 2)
-```
+![One module on the mains feed and one module per sub-load, all on a shared I²C bus read by a single master.](images/fleet-topology-mains-plus-subloads.png)
 
 - 1 module on the mains feed — overall consumption and grid quality.
 - N modules on individual loads — per-channel metering.
@@ -229,7 +208,7 @@ Internally the library guarantees:
 | Reading U / I / P / PF / frequency | ✅ | only for debugging on a logic analyzer |
 | Per-period energy metering | ✅ | only if Wh are stored outside the library (e.g., in a database on the master side) |
 | Several modules on one bus | ✅ | — |
-| Bidirectional metering on BASIC | ✅ (via RT sampling — see [06_examples.md](06_examples.md)) | alternative — your own loop of RT reads + manual integration |
+| Bidirectional metering on BASIC | ✅ (via RT reads — see [06_examples.md](06_examples.md)) | alternative — your own loop of RT reads + manual integration |
 | Porting to a non-Arduino platform | n/a | ✅ — see [09 · API Reference](09_api_reference.md), the "Wire-protocol details" section |
 | Hard RAM limit (AVR Uno) | ~42 B per `RbAmp` instance + 63 B per snapshot; feasible, but tight on multi-module (3 modules × ~42 B + 3 × 63 B ≈ 315 B already takes a noticeable share of the application's RAM budget) | ✅ if the library instance does not fit |
 
@@ -237,84 +216,13 @@ For all the typical tasks in the first rows the library is the right fit.
 
 ## Architecture
 
-```text
-┌─────────────────────────────────────────────────────┐
-│  User sketch (.ino)                                 │
-│   RbAmp dev(Wire, 0x50);                            │
-│   dev.begin();                                      │
-│   dev.setSensorClass(RbAmpSensorClass::Sct013);     │
-│   dev.setCTModel(RbAmpCTModel::Sct013_030);         │
-│   dev.readPeriodSnapshot(snap);                     │
-│   dev.energy().wh(0);                               │
-└─────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  Public API of the RbAmp class (RbAmp.h)            │
-│   ┌─────────────────────────────────────────────┐   │
-│   │ Lifecycle:      begin / probe / waitReady   │   │
-│   │ RT reads:       readVoltage / readPower / … │   │
-│   │ Period:         latchPeriod /               │   │
-│   │                 readPeriodSnapshot          │   │
-│   │ Configuration:  setSensorClass / setCTModel │   │
-│   │ Diagnostics:    lastError / errorString /   │   │
-│   │                 retryExhaustionCount        │   │
-│   └─────────────────────────────────────────────┘   │
-│                       │                             │
-│                       ▼                             │
-│   ┌─────────────────────────────────────────────┐   │
-│   │ Internal helpers (RbAmp.cpp):               │   │
-│   │  readU8 / readU16LE / readU32LE / readFloatLE│   │
-│   │  writeReg / writeCmd                        │   │
-│   └─────────────────────────────────────────────┘   │
-│                       │                             │
-│                       ▼                             │
-│   ┌─────────────────────────────────────────────┐   │
-│   │ Instance state:                             │   │
-│   │  • RbAmpEnergy — Wh accumulator             │   │
-│   │  • RbAmpSnapshot / RbAmpPeriodSnapshot      │   │
-│   │  • Time of last latch (master_dt_ms)        │   │
-│   └─────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  Arduino Wire — native I²C on the host platform     │
-└─────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  rbAmp module at address 0x50                       │
-│   • Measurement pipeline U / I / P / PF (~100 ms)   │
-│   • Period accumulator (atomic CMD_LATCH_PERIOD)    │
-└─────────────────────────────────────────────────────┘
-```
+![Where your sketch sits: sketch, RbAmp library, Wire (I²C) and the rbAmp module at the default address 0x50.](images/arduino-architecture.png)
 
 ## Interaction diagrams
 
 ### The `begin()` flow
 
-```text
-sketch        RbAmp                Wire                rbAmp module
-  │             │                    │                       │
-  ├─dev.begin()►                     │                       │
-  │             ├─readU8(REG_VERSION)►                       │
-  │             │                    ├──[0x50, 0x03]────────►│
-  │             │                    │◄────────────────ACK───┤
-  │             │                    ├──[read 1 byte]───────►│
-  │             │                    │◄──────────────[0x03]──┤
-  │             │◄─────── version_byte ─────┤                  │
-  │             │                    │                       │
-  │             ├─readFloatLE(U_RMS)─►│ (4 single-byte reads) │
-  │             │  → 226.3 V         │                       │
-  │             │  → has_voltage_hw = true │                  │
-  │             │                    │                       │
-  │             ├─writeCmd(LATCH)───►│                       │
-  │             │                    ├──[0x50, 0x01, 0x27]──►│
-  │             │  delay(50)         │                       │
-  │             │                    │                       │
-  │◄────true────┤                    │                       │
-```
+![Sequence of begin(): version read, line detection, primer latch (discarded), then ready.](images/arduino-begin-flow.png)
 
 The first latch is a primer (the module returns what it has
 accumulated since power-on, which is unsuitable for tariff metering).
@@ -323,27 +231,7 @@ the user code never sees this.
 
 ### The `readPeriodSnapshot(snap)` flow
 
-```text
-sketch        RbAmp                Wire                rbAmp module
-  │             │                    │                       │
-  ├─readPeriodSnapshot(snap)─►       │                       │
-  │             ├─writeCmd(LATCH)───►│  master_t_now = now() │
-  │             │                    │                       │
-  │             │  delay(50)         │                       │
-  │             │                    │                       │
-  │             ├─readU8(PERIOD_VALID)► │                     │
-  │             │  → bit0 = 1        │                       │
-  │             │                    │                       │
-  │             ├─readFloatLE(AVG_P0)►(4 reads) │            │
-  │             ├─readFloatLE(MAX_P0)►(4 reads) │            │
-  │             ├─readU32LE(LATCH_MS)►(4 reads) │            │
-  │             │                    │                       │
-  │             │  dt_s = (now() − last_latch_ms) / 1000 │    │
-  │             │  energy_[ch] += avg_p[ch] × dt_s / 3600│    │
-  │             │  last_latch_ms = master_t_now          │    │
-  │             │                    │                       │
-  │◄────true────┤                    │                       │
-```
+![Sequence of readPeriodSnapshot(): the library closes the period on the module, reads the snapshot, integrates energy on the master clock and returns the result to the sketch.](images/arduino-snapshot-flow.png)
 
 The atomic latch on the module side guarantees that every
 measurement within the period lands in exactly one snapshot — no

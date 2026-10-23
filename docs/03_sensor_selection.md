@@ -1,6 +1,6 @@
 # 03 · Current sensor selection
 
-![CT clamp installation: clamp the L wire only, arrow pointing toward the load](images/hw-ct-install.png)
+![CT clamp installation: clamp the L wire only, arrow pointing toward the load.](images/hw-ct-install.png)
 
 This chapter answers two questions:
 
@@ -56,6 +56,8 @@ The basic rule:
    rated far too large reads noisily at small currents (an SCT-013-100 on a
    5 A circuit works, but with poor resolution).
 
+![How to choose an SCT-013 clamp: take the largest expected current plus 30 % margin, pick the smallest rated clamp above it, and set its model code.](images/sct-model-chooser.png)
+
 ### Headroom
 
 An SCT-013 clamp operates without saturation within its rated range.
@@ -64,9 +66,10 @@ rating by 5-7× — this is **normal**, the clamp physically withstands
 it, but the measurement becomes nonlinear above the rating.
 
 If your load has a peak current above the clamp's rating, choose the
-next size up. For example, for a washing machine with a 12 A inrush
-current (and a 2-3 A rating during operation), an SCT-013-030 is
-better than an SCT-013-005.
+next size up: the smallest rated clamp above the peak plus a 30 %
+margin. For example, for a washing machine with a 12 A inrush current
+(and 2-3 A during operation), 12 A × 1.3 = 15.6 A, so choose an
+SCT-013-020 (not an SCT-013-005, which would clip at the peak).
 
 ## Telling the module about your choice
 
@@ -374,7 +377,7 @@ float read_combined_current(RbAmp& dev) {
 }
 ```
 
-![Dual-CT install: two clamps on one L wire (low-range + high-range), both arrows toward the load](images/ct-install-dual.png)
+![Dual-CT install: two clamps on one L wire, a low-range and a high-range one, both arrows toward the load.](images/ct-install-dual.png)
 
 <!-- MD028 separator -->
 

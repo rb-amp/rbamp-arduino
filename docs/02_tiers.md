@@ -1,6 +1,6 @@
 # 02 · Module tiers
 
-![rbAmp product tiers: BASIC / STANDARD / PRO capability ladder](images/tier-ladder.png)
+![The BASIC and STANDARD (STD) module lines side by side: energy on the master for BASIC, on the module for STD.](images/module-lines.png)
 
 ## What a module line is
 
@@ -66,6 +66,8 @@ absent from the library's Wh counter on BASIC.
   required
 
 ### Bidirectional metering on BASIC (master-side)
+
+![Energy accounting on BASIC (consumption on the module, export integrated on the master) and on STANDARD (STD) (import, export and net counters on the module).](images/energy-basic-vs-std.png)
 
 If you need to track export to the grid separately on a BASIC module,
 **do it on the master side**. The RT power `dev.readPower(0)` is
@@ -150,6 +152,8 @@ PRO is not implemented: there are no PRO modules and this library has no
 PRO-specific API.
 
 ## How to detect the line at runtime
+
+![How to tell which module line you own: read the label or call line() after begin().](images/module-line-detect.png)
 
 ```cpp
 if (!dev.begin()) { /* see dev.errorString() */ }

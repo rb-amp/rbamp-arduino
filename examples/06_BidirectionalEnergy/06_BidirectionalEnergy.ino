@@ -37,8 +37,8 @@ void setup() {
 }
 
 void loop() {
-    /* Sample RT real power every 100 ms — matches the device's measurement
-     * window (images before v1.2 published every 200 ms; sampling at 100 ms
+    /* Read RT real power every 100 ms — matches the device's measurement
+     * window (images before v1.2 published every 200 ms; reading at 100 ms
      * simply reads some windows twice there). */
     if (millis() - last_sample_ms < 100) {
         delay(5);

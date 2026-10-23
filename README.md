@@ -96,7 +96,7 @@ The module returns **only instantaneous and period-averaged quantities** — vol
 E_Wh += PERIOD_AVG_P_W × master_dt_seconds / 3600
 ```
 
-That gives every module in the system the same time base (see [04_period_metering.md](https://github.com/rb-amp/rbamp-spec/blob/main/docs/04_period_metering.md) in the canonical spec), with no need to reconcile internal clocks across devices. The library integrates against the **master's wall-clock**, never the module's diagnostic period timer; on a missed/stale period the integration anchor is held so the next valid window is not under-counted.
+That gives every module in the system the same time base (see [Period metering](https://www.rbamp.com/docs/modules-basic-standard-period-metering) in the module documentation), with no need to reconcile internal clocks across devices. The library integrates against the **master's wall-clock**, never the module's diagnostic period timer; on a missed/stale period the integration anchor is held so the next valid window is not under-counted.
 
 What else:
 
@@ -136,7 +136,7 @@ What else:
 | [10 · Troubleshooting](docs/10_troubleshooting.md) | common problems and how to work through them |
 | [11 · Changelog](docs/11_changelog.md) | library release history |
 
-The wire-level protocol description (shared by all client libraries) lives in the [`rbamp-spec`](https://github.com/rb-amp/rbamp-spec) repository.
+The wire-level protocol description (shared by all client libraries) is documented in the [`rbamp-docs`](https://github.com/rb-amp/rbamp-docs) repository.
 
 ## Examples
 
@@ -181,9 +181,9 @@ The rbAmp module wire protocol is implemented by a family of cross-platform clie
 | **ESP-IDF component** | ESP-IDF 5.x native C with FreeRTOS, esp-mqtt, deep sleep | [`rbamp-esp-idf`](https://github.com/rb-amp/rbamp-esp-idf) |
 | **Python package** (CPython + MicroPython) | Raspberry Pi / Linux SBC over `smbus2`, OR MicroPython on ESP32 / RP2040 / STM32 | [`rbamp-python`](https://github.com/rb-amp/rbamp-python) |
 | **ESPHome external component** | Declarative YAML integration with Home Assistant | [`rbamp-esphome`](https://github.com/rb-amp/rbamp-esphome) |
-| **STM32 HAL** | Bare HAL on STM32F1/F4/G0/G4 — no Arduino runtime, no RTOS | [`rbamp-stm32-hal`](https://github.com/rb-amp/rbamp-stm32-hal) *(separate library)* |
+| **STM32 HAL** | Bare HAL on STM32F1/F4/G0/G4 — no Arduino runtime, no RTOS | STM32 HAL examples are in [`rbamp-docs`](https://github.com/rb-amp/rbamp-docs) *(no separate library)* |
 
-For the wire protocol itself (registers, commands, errors, NACK discipline), see [`rbamp-spec`](https://github.com/rb-amp/rbamp-spec).
+For the wire protocol itself (registers, commands, errors, NACK discipline), see [`rbamp-docs`](https://github.com/rb-amp/rbamp-docs).
 
 ## License
 

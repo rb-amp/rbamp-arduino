@@ -1,6 +1,6 @@
 # 10 · Troubleshooting
 
-![Troubleshooting decision tree: symptom → quick check → action](images/troubleshoot-flowchart.png)
+![Troubleshooting decision tree: from the symptom to a quick check and an action.](images/troubleshoot-flowchart.png)
 
 This chapter is organized by **the symptoms you observe**, not by
 internal error classification. If you're here, something isn't

@@ -24,6 +24,8 @@ from mains.
 | `SCL` | I²C SCL | I²C clock |
 | `DRDY` | Data-ready (optional) | Open-drain, LOW pulse ~10 µs every ~100 ms |
 
+![The low-voltage header of the rbAmp module: VCC, GND, SDA, SCL and the optional DRDY pin with what each needs.](images/hw-pinout.png)
+
 ## Power
 
 ### VCC parameters
@@ -31,7 +33,7 @@ from mains.
 - **Nominal voltage**: 5 V DC
 - **Permissible range**: 4.5..5.5 V
 - **Supply current**: ~15 mA typical, ~25 mA peak during flash writes
-- **Ripple**: < 50 mV peak-to-peak (for ADC accuracy)
+- **Ripple**: < 50 mV peak-to-peak (for measurement accuracy)
 
 The module carries an on-board regulator, RC filter, ceramic capacitors, and a
 ferrite bead — no additional filtering is required from the user.
@@ -104,11 +106,17 @@ blade to disable a pull-up:
 |:---:|---|
 | 1 | Leave as-is (the built-in 4.7 kΩ works) |
 | 2 | Leave on one, cut on the other |
-| 3+ | Cut on all modules, fit one external 2.2…4.7 kΩ pair near the master |
+| 3 | Cut on all modules, fit one external 2.7…3.3 kΩ pair near the master |
+| 4…6 | Cut on all modules, one external 2.2…2.7 kΩ pair near the master |
+| 7…16 | Cut on all modules, one external 1.5…2.2 kΩ pair near the master; check the bus capacitance (≤ 400 pF), lower the bus speed if needed |
+
+The external values are recommended values (calculated from the I²C specification: sink current ≤ 3 mA at 3.3 V, bus capacitance ≤ 400 pF).
 
 > **If in doubt**: measure the resistance between SDA and VCC with
 > the devices unpowered. It should be in the **1.5..4.7 kΩ** range.
 > Lower than that means too many active pull-ups in parallel.
+
+![How many modules are on the bus and which I²C pull-ups stay: keep the built-in pair for one module, keep one for two, cut all and use one external pair for three or more.](images/i2c-pullup-rules.png)
 
 ## I²C bus parameters
 
@@ -182,6 +190,8 @@ how to tell the module via `dev.setCTModel(code)` — see
 [03_sensor_selection.md](03_sensor_selection.md).
 
 > ⚠ **CT clamp polarity matters on BASIC**: if the clamp arrow points away from the load (or L/N on the terminals are swapped), `P_real` reads negative under consumption — and the BASIC tier clamps `max(P, 0)`, so the Wh counter stays at zero. Flip the clamp on the conductor physically; do not invert it in software.
+
+![Mains-side connection in a panel: CT clamp on the L wire after the incoming breaker, N outside the clamp, fused L tap and N for the voltage reference.](images/mains-ct-connection-panel.png)
 
 ## DATA_READY (DRDY)
 
@@ -305,7 +315,7 @@ translator needed.
 | `GND` | `GND` |
 | `SDA` | `GPIO21` |
 | `SCL` | `GPIO22` |
-| `DRDY` (opt.) | any free GPIO, e.g. `GPIO15` |
+| `DRDY` (opt.) | any free GPIO, e.g. `GPIO4` |
 
 ```cpp
 #include <Wire.h>
@@ -430,51 +440,24 @@ depend on the board.
 
 ## Reference wiring diagram (ESP32 + single module)
 
-```text
-                                rbAmp module
-                            +----------------------+
-                            |   LV side            |  mains side
-ESP32 GPIO22 (SCL) ---------| SCL                  |◄[CT jack 3.5mm]── SCT-013 → to L
-ESP32 GPIO21 (SDA) ---------| SDA                  |◄[L terminal]──── L wire
-ESP32 GPIO15 (IN, opt.)-----| DRDY (open-drain)    |◄[N terminal]──── N wire
-                            |                      |
-ESP32 +5V    ---------------| VCC                  |
-ESP32 GND    ---------------| GND                  |
-                            +----------------------+
+![Reference wiring of an ESP32 board to a single rbAmp module, with the CT clamp on the L wire.](images/hw-wiring-esp32.png)
 
 In this configuration:
- - External pull-ups on I²C are NOT needed (built into the module).
- - DRDY is optional; INPUT_PULLUP on the ESP32 pin is enough.
- - The SCT-013 jack is fully inserted.
- - The clamp is fully closed on the L wire, arrow toward the load.
-```
+
+- External pull-ups on I²C are NOT needed (built into the module).
+- DRDY is optional; as in the picture, use an external 10 kΩ pull-up to 3.3 V (INPUT_PULLUP on the ESP32 pin also works on short wires).
+- The SCT-013 jack is fully inserted.
+- The clamp is fully closed on the L wire, arrow toward the load.
 
 ## Reference wiring diagram (Arduino UNO + single module)
 
-```text
-                                rbAmp module
-                            +----------------------+
-                            |   LV side            |  mains side
-UNO A5 (SCL) ---------------| SCL                  |◄[CT jack 3.5mm]── SCT-013 → to L
-UNO A4 (SDA) ---------------| SDA                  |◄[L terminal]──── L wire
-UNO D2 (IN, opt.) ◄──[10K]─┐| DRDY (open-drain)    |◄[N terminal]──── N wire
-          (10K to 3.3 V)    |                      |
-UNO +5V      ---------------| VCC                  |
-UNO GND      ---------------| GND                  |
-                            +----------------------+
+![Reference wiring of an Arduino UNO to a single rbAmp module, with the CT clamp on the L wire.](images/hw-wiring-uno.png)
 
 In this configuration:
- - External pull-ups on I²C are NOT needed.
- - The UNO is 5 V logic; the module's SDA/SCL are 5 V tolerant, no level
-   translator required.
- - DRDY has a 3.3 V level — on the UNO a TTL input reads this as
-   HIGH (VIH_TTL ≥ 2.0 V, 3.3 V > 2.0 V). A DRDY pull-up is recommended
-   specifically to 3.3 V for safety: if the DRDY pin's internal
-   protection circuits are not 5 V tolerant (separately from the I²C
-   lines, whose 5 V tolerance is confirmed), a pull-up to 5 V would create a small
-   leakage current through the ESD diodes into the module's 3.3 V rail.
-   To 3.3 V — never a problem.
-```
+
+- External pull-ups on I²C are NOT needed.
+- The UNO is 5 V logic; the module's SDA/SCL are 5 V tolerant, no level translator required.
+- DRDY has a 3.3 V level — on the UNO a TTL input reads this as HIGH (VIH_TTL ≥ 2.0 V, 3.3 V > 2.0 V). A DRDY pull-up is recommended specifically to 3.3 V for safety: if the DRDY pin's internal protection circuits are not 5 V tolerant (separately from the I²C lines, whose 5 V tolerance is confirmed), a pull-up to 5 V would create a small leakage current through the ESD diodes into the module's 3.3 V rail. To 3.3 V — never a problem.
 
 ## Multi-phase models and the STANDARD (STD) line
 
@@ -506,6 +489,8 @@ ESP32 through `RbAmpFleet`. All the rules and optimizations below are designed
 for exactly this topology; a single module is a special case (the same
 handle, but the fleet calls degenerate into trivial ones).
 
+![Several rbAmp modules on one I²C bus with the built-in pull-ups cut and one external pull-up pair at the master, plus the DRDY options.](images/hw-multimodule-bus.png)
+
 ### Typical deployments
 
 | Scenario | Configuration | Module count |
@@ -517,8 +502,8 @@ handle, but the fleet calls degenerate into trivial ones).
 ### Electrical limits
 
 - **Module count**: up to ~16 (total bus capacitance ≤ 400 pF at 100 kHz; at 50 kHz there is more margin).
-- **Pull-ups for the fleet bus (important)**: each module ships with built-in 4.7 kΩ. On a multi-module bus N pull-ups work in parallel → the sink is overloaded and the bus cannot pull down to LOW. **Cut the built-in pull-ups on all modules except one** (or cut them on all and keep **only external** ~4.7 kΩ to 3.3 V at a single point on the bus — recommended for long runs / noise / ESP32 as master).
-- The ESP32's internal pull-ups (~45 kΩ) are **too weak** for a multi-module bus with real run lengths — **external** ~4.7 kΩ are needed. This is part of the three-layer mitigation against bus-hang on a marginal bus — see [10 · Troubleshooting](10_troubleshooting.md), the section "ESP32 project hangs".
+- **Pull-ups for the fleet bus (important)**: each module ships with built-in 4.7 kΩ. On a multi-module bus N pull-ups work in parallel → the sink is overloaded and the bus cannot pull down to LOW. **Cut the built-in pull-ups on all modules except one** (or cut them on all and keep **only external** pull-ups (2.7…3.3 kΩ for 3 modules, lower for larger buses — see the table above) to 3.3 V at a single point on the bus — recommended for long runs / noise / ESP32 as master).
+- The ESP32's internal pull-ups (~45 kΩ) are **too weak** for a multi-module bus with real run lengths — **external** pull-ups are needed (values: see the table above). This is part of the three-layer mitigation against bus-hang on a marginal bus — see [10 · Troubleshooting](10_troubleshooting.md), the section "ESP32 project hangs".
 
 ### Addressing — provisioning and field-swap (production-OK)
 
@@ -527,6 +512,8 @@ goes through **provisioning** (once): reassignment from `0x50` to a
 working address + optional saving of the configuration (CT models,
 group_id, label) to flash. Factory-mode is **not required** —
 the address change works directly in production via two-phase address commit.
+
+![Provisioning addresses one virgin module at a time: connect one module at 0x50, run the provision call, verify at the new address, then connect the next.](images/fleet-provisioning-one-virgin.png)
 
 #### Method 1 — `RbAmpFleet::provision()` (recommended)
 
@@ -607,6 +594,8 @@ At 50 kHz, one read transaction ≈ 200-400 µs. A full RT block of one channel 
 **Rule**: at 50 kHz the comfortable limits are **8-10× UI3** or **15-16× UI1** at 5 Hz polling (every second module window), and roughly half of that at the full 10 Hz.
 
 ### Period sync
+
+![Period sync across modules: sequential latch with a small stagger versus one General-Call frame at address 0x00.](images/period-broadcast-latch.png)
 
 For tariff metering, all modules must latch **the same** interval. Two strategies:
 

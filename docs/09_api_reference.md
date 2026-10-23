@@ -1,8 +1,8 @@
 # 09 · API Reference
 
-![rbAmp register map — page-0 address space (0x00..0xFF)](images/api-register-map.png)
+![Register map of the module: the page-0 address space 0x00 to 0xFF.](images/api-register-map.png)
 
-![Atomic period latch — one write closes the period and opens the next](images/period-atomic-latch.png)
+![Atomic period latch: one write closes the current period and opens the next.](images/period-atomic-latch.png)
 
 The public API of the `RbAmp` library for Arduino as of v1.6.1. One class
 serves both module product lines — **BASIC** and **STANDARD (STD)**:
@@ -174,6 +174,8 @@ performs an I²C transaction.
 > [Identification and provisioning](#identification-and-provisioning-v13).
 
 ### Real-time reads (RT block, 100 ms refresh)
+
+![Real-time window timing: back-to-back 100 ms windows, one short DRDY pulse per window and the atomic result block read in one burst.](images/rt-window-timing.png)
 
 All methods return `float`. On error they return `NAN` and set
 `lastError()`. Under the hood a retry + sanity filter is used for

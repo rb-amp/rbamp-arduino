@@ -189,7 +189,7 @@ integrates natively with HA over the ESPHome API (not MQTT) — the
 device shows up in HA automatically after flashing.
 
 The `rbamp-esphome` component lives in a separate repository — see
-the [rbAmp main index](https://github.com/rb-amp/rbamp) for links.
+the [rbAmp main index](https://github.com/rb-amp) for links.
 
 ---
 
