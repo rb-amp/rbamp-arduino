@@ -136,6 +136,8 @@ What else:
 | [10 · Troubleshooting](docs/10_troubleshooting.md) | common problems and how to work through them |
 | [11 · Changelog](docs/11_changelog.md) | library release history |
 
+Register-level (native) protocol documentation, for integrations without this library: [rbamp-docs](https://github.com/rb-amp/rbamp-docs).
+
 The wire-level protocol description (shared by all client libraries) is documented in the [`rbamp-docs`](https://github.com/rb-amp/rbamp-docs) repository.
 
 ## Examples
@@ -154,7 +156,7 @@ Ready sketches in [`examples/`](examples/):
 10. [`10_PerChannelModels`](examples/10_PerChannelModels/) — a different current sensor on every channel
 11. [`11_StdLine`](examples/11_StdLine/) — one sketch for both product lines; STD extras (Q / S, health, snapshot banks)
 
-Each sketch is walked through in detail in [docs/06_examples.md](docs/06_examples.md). A bench-only validation harness lives in [`extras/`](extras/) (not a Library-Manager example).
+Each sketch is walked through in detail in [docs/06_examples.md](docs/06_examples.md).
 
 ## Compatibility
 
